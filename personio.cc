@@ -27,11 +27,18 @@
 //            the family ids in the output file
 // <printTrioKids> if non-zero, should print the haplotypes for trio
 //                 children
+// <numMendelError> if non-NULL, is to be assigned a newly allocated array
+//                  with the number of non-Mendelian errors in the data for
+//                  each site. Array is expected to have the same number of
+//                  indexes as there are markers in the data
+// <numMendelCounter> if non-NULL, is the number of trios/duos examined for
+//                    Mendelian errors; a denominator for <numMendelError>
 template <class P>
 void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, int onlyChr,
 			   int startPos, int endPos, int analyzeChrX,
 			   int noFamilyId, int printTrioKids,
+			   int **numMendelError, int **numMendelCounted,
 			   bool printGenetLength, FILE *log) {
   // open genotype file and determine file type:
   FILE *genoIn = fopen(genoFile, "r");
@@ -161,13 +168,36 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
     }
   }
 
+  if (numMendelError != NULL || numMendelCounted != NULL) {
+    if (numMendelError == NULL || numMendelCounted == NULL) {
+      fprintf(stderr, "ERROR: must have both numMendelError and numMendelConter non-NULL if one is\n");
+      exit(1);
+    }
+
+    if (!mightHaveParents) {
+      fprintf(stderr, "ERROR: no family relationships in fam file: can't detect Mendelian errors\n");
+      if (log)
+	fprintf(log, "ERROR: no family relationships in fam file: can't detect Mendelian errors\n");
+      exit(4);
+    }
+
+    // Allocate space to store the NME rates, and initialize:
+    int numMarkers = Marker::getNumMarkers();
+    *numMendelError   = new int[numMarkers];
+    *numMendelCounted = new int[numMarkers];
+    for (int i = 0; i < numMarkers; i++) {
+      (*numMendelError)[i] = (*numMendelCounted)[i] = 0;
+    }
+  }
+
   if (mightHaveParents) {
 //    printf("Rereading fam file to identify and infer unambiguous trio/duo phase... ");
     printf("Rereading fam file to identify family relationships... ");
     if (log)
 //      fprintf(log, "Rereading fam file to identify and infer unambiguous trio/duo phase... ");
       fprintf(log, "Rereading fam file to identify family relationships... ");
-    findRelationships(indivIn, log, noFamilyId);
+    findRelationships(indivIn, log, noFamilyId, *numMendelError,
+		      *numMendelCounted);
     printf("done.\n");
     if (log)
       fprintf(log, "done.\n");
