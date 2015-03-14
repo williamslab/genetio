@@ -22,7 +22,7 @@ class PersonIO {
     static void readData(const char *genoFile, const char *markerFile,
 			 const char *indFile, int onlyChr,
 			 int startPos, int endPos, int analyzeChrX,
-			 int noFamilyId, int printTrioKids,
+			 int noFamilyId, int printTrioKids = true,
 			 bool printGenetLength = false, FILE *log = NULL);
 
     static void readIndivs(FILE *in);
