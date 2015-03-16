@@ -23,9 +23,9 @@ class PersonIO {
 			 const char *indFile, int onlyChr,
 			 int startPos, int endPos, int analyzeChrX,
 			 int noFamilyId, int printTrioKids = false,
+			 bool printGenetLength = false, FILE *log = NULL,
 			 int **numMendelError = NULL,
-			 int **numMendelCounted = NULL,
-			 bool printGenetLength = false, FILE *log = NULL);
+			 int **numMendelCounted = NULL);
 
     static void readIndivs(FILE *in);
     static bool readPedOrFamFile(FILE *in, bool omitFamilyId,

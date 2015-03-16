@@ -38,8 +38,8 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, int onlyChr,
 			   int startPos, int endPos, int analyzeChrX,
 			   int noFamilyId, int printTrioKids,
-			   int **numMendelError, int **numMendelCounted,
-			   bool printGenetLength, FILE *log) {
+			   bool printGenetLength, FILE *log,
+			   int **numMendelError, int **numMendelCounted) {
   // open genotype file and determine file type:
   FILE *genoIn = fopen(genoFile, "r");
   if (!genoIn) {
