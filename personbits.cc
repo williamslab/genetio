@@ -156,7 +156,7 @@ void PersonBits::inferTrioDuoHaplotypes(PersonBits *child,
 					int *numMendelCounted) {
   int numMarkers = Marker::getNumMarkers();
 
-  int chrom = Marker::getMarker(/*marker=*/ 0)->getChrom();
+  int chromIdx = Marker::getMarker(/*marker=*/ 0)->getChromIdx();
 
   bool isTrio = parents[1] != NULL;
   if (isTrio) {
@@ -203,10 +203,8 @@ void PersonBits::inferTrioDuoHaplotypes(PersonBits *child,
   // curChunkIdx: which bit/locus within the chunk are we on?
   uint32_t curHapChunk = 0, curChunkIdx = 0;
   for(int m = 0; m < numMarkers; m++, curChunkIdx++) {
-    if (Marker::getLastMarkerNum(chrom) == m - 1) {
-      chrom = Marker::getMarker(m)->getChrom();
-      if (chrom > CHR_LAST_AUTOSOME)
-	break; // only inferring on autosomes
+    if (Marker::getLastMarkerNumX(chromIdx) == m - 1) {
+      chromIdx = Marker::getMarker(m)->getChromIdx();
 
       if (curChunkIdx < BITS_PER_CHUNK) {
 	// clear out the final bits in _childIsHet that aren't defined because
@@ -450,22 +448,20 @@ void PersonBits::printTrioEigenstratPhased(FILE *out) {
   int numMarkers = Marker::getNumMarkers();
   int numIndivs = _allIndivs.length();
 
-  int chrom = Marker::getMarker(/*marker=*/ 0)->getChrom();
+  int chromIdx = Marker::getMarker(/*marker=*/ 0)->getChromIdx();
 
   // curHapChunk: which haplotype chunk are we on? (BITS_PER_CHUNK bit chunks)
   // curChunkIdx: which bit/locus within the chunk are we on?
   for(int m = 0, curHapChunk = 0, curChunkIdx = 0; m < numMarkers;
 							  m++, curChunkIdx++) {
-    if (Marker::getLastMarkerNum(chrom) == m - 1) {
+    if (Marker::getLastMarkerNumX(chromIdx) == m - 1) {
       // Now on next chromosome; update chunk indices
       if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
 	curHapChunk++; // markers for current chrom are on next chunk number
 	curChunkIdx = 0;
       }
-      chrom = Marker::getMarker(m)->getChrom();
+      chromIdx = Marker::getMarker(m)->getChromIdx();
 
-      if (chrom > CHR_LAST_AUTOSOME)
-	break; // only inferring on autosomes
     }
     if (curChunkIdx == BITS_PER_CHUNK) {
       curHapChunk++;
@@ -625,7 +621,7 @@ void PersonBits::initRandSampledHaps() {
   }
 }
 
-void PersonBits::setGenotype(int hapChunkNum, int chunkIdx, int chrom,
+void PersonBits::setGenotypeX(int hapChunkNum, int chunkIdx, int chromIdx,
 			     int chrMarkerIdx, int geno[2]) {
   if (_ignore)
     return; // no need/nowhere to store genotypes
@@ -665,9 +661,10 @@ void PersonBits::setMissing(int hapChunkNum, int chunkIdx) {
 // If non-NULL, sets *numHets and *numCalls to be the number of heterozygous
 // sites and the number of called (non-missing) sites for <this>.  Those
 // counts are *before* setting heterozygous sites to missing.
+// Code assumes that the entire dataset is the X chromosome
 void PersonBits::setXHetToMissing(int *numHets, int *numCalls) {
-  assert(Marker::getMarker(0)->getChrom() == CHR_X);
-  assert(Marker::getNumChromMarkers(CHR_X) == Marker::getNumMarkers());
+//  assert(Marker::getMarker(0)->getChrom() == CHR_X);
+//  assert(Marker::getNumChromMarkers(CHR_X) == Marker::getNumMarkers());
   assert(getGender() == 'M');
 
   if (numHets != NULL) {

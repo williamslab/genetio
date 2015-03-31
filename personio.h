@@ -20,16 +20,19 @@ class PersonIO {
     //////////////////////////////////////////////////////////////////
 
     static void readData(const char *genoFile, const char *markerFile,
-			 const char *indFile, int onlyChr,
-			 int startPos, int endPos, int analyzeChrX,
-			 int noFamilyId, int printTrioKids = false,
-			 bool printGenetLength = false, FILE *log = NULL,
+			 const char *indFile, const char *onlyChr,
+			 int startPos, int endPos, const char *XchrName,
+			 int noFamilyId, bool vcfInput,
+			 int printTrioKids = false, FILE *log = NULL,
 			 int **numMendelError = NULL,
 			 int **numMendelCounted = NULL);
+    static void readVCF(const char *vcfFile, const char *onlyChr, int startPos,
+			int endPos, const char *XcharName, FILE *log = NULL);
 
     static void readIndivs(FILE *in);
     static bool readPedOrFamFile(FILE *in, bool omitFamilyId,
 				 bool knowIsFam = false);
+    static void makePersonsFromIds(char **ids, uint32_t numIds);
     static void parsePedGenotypes(FILE *in, P *thePerson);
     static void findRelationships(FILE *in, FILE *log, bool omitFamilyId,
 				  int *numMendelError = NULL,

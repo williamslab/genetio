@@ -16,16 +16,17 @@ dynarray<int> Marker::_omitMarkers;
 bool Marker::_readOnlyOneChrom = false;
 int Marker::_firstStoredMarkerIdx = -1; // by default -1 => not applicable
 int Marker::_numMarkersInFile = 0; // gets updated as we read the file
-int Marker::_firstMarkerNum[LAST_CHROM + 1] = { 0 };
-int Marker::_lastMarkerNum[LAST_CHROM + 1];
-int Marker::_firstHapChunk[LAST_CHROM + 1] = { 0 };
-int Marker::_lastHapChunk[LAST_CHROM + 1];
+dynarray<char *> Marker::_chromNames;
+dynarray<int> Marker::_firstMarkerNumX;
+dynarray<int> Marker::_lastMarkerNumX;
+dynarray<int> Marker::_firstHapChunkX;
+dynarray<int> Marker::_lastHapChunkX;
 int Marker::_numHapChunks = 0;
 dynarray<int>    Marker::_hapWindowEnds;
 dynarray<float> Marker::_hapWindowMapCenter;
 
 // Read Reich lab format .snp file
-void Marker::readSNPFile(const char *snpFile, int onlyChr, int startPos,
+void Marker::readSNPFile(const char *snpFile, const char *onlyChr, int startPos,
 			 int endPos) {
   FILE *in = fopen(snpFile, "r");
   if (!in) {
@@ -39,7 +40,7 @@ void Marker::readSNPFile(const char *snpFile, int onlyChr, int startPos,
 }
 
 // Read PLINK format .map file
-void Marker::readMapFile(const char *mapFile, int onlyChr, int startPos,
+void Marker::readMapFile(const char *mapFile, const char *onlyChr, int startPos,
 			 int endPos) {
   FILE *in = fopen(mapFile, "r");
   if (!in) {
@@ -53,7 +54,7 @@ void Marker::readMapFile(const char *mapFile, int onlyChr, int startPos,
 }
 
 // Read PLINK format .bim file
-void Marker::readBIMFile(const char *bimFile, int onlyChr, int startPos,
+void Marker::readBIMFile(const char *bimFile, const char *onlyChr, int startPos,
 			 int endPos) {
   FILE *in = fopen(bimFile, "r");
   if (!in) {
@@ -66,11 +67,156 @@ void Marker::readBIMFile(const char *bimFile, int onlyChr, int startPos,
   fclose(in);
 }
 
+// Read markers from VCF file (which is required to be gzipped)
+void Marker::readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
+			 int startPos, int endPos) {
+  std::string markerName;
+  std::string alleles;
+  std::string tmpStr;
+  int chromIdx = -1;
+  Marker *prevMarker = NULL;
+  int physPos;
+
+  int numMarkersCurChrom = 0;
+
+  // Start parsing the VCF using HTSlib; gives one line at a time:
+  // Go through all the lines in the query region
+  kstring_t line = { 0, 0, 0 };
+  while (tbx_itr_next(vcfIn, index, itr, &line) >= 0) {
+    // string for the current line is in line.s
+    // parse the parts of the string having to do with the marker:
+
+    // read chromosome/contig name:
+    int c;
+    tmpStr.clear();
+    for(c = 0; line.s[c] != '\t'; c++) // to end of the field
+      tmpStr += line.s[c];
+
+    // Note: because we're using the HTS iterator and have given it a region to
+    // iterate over (in PersonIO::readVCF()), we don't need to check whether the
+    // chromosome is relevant here
+
+    // same chromosome as the previous marker?
+    if (chromIdx < 0 || strcmp(tmpStr.c_str(), _chromNames[chromIdx]) != 0) {
+      // new chromosome
+      if (chromIdx >= 0 && _readOnlyOneChrom) {
+	printf("\n\n");
+	printf("ERROR: markers present from multiple chromosomes/contigs.\n");
+	printf("Please specify a chromosome to process with --chr\n");
+	exit(1);
+      }
+
+      int length = c+1; // + 1 due to '\0'
+      char *newChrom = new char[length];
+      strcpy(newChrom, tmpStr.c_str());
+      _chromNames.append(newChrom);
+      chromIdx = _chromNames.length() - 1;
+
+      _firstMarkerNumX.append(0);
+      _lastMarkerNumX.append(-1);
+      _firstHapChunkX.append(0);
+      _lastHapChunkX.append(-1);
+    }
+
+    // read physical position:
+    int s = c + 1; // shift to the start of this field
+    tmpStr.clear();
+    for(c = 0; line.s[s+c] != '\t'; c++) // to end of the field
+      tmpStr += line.s[s+c];
+    s += c + 1; // update shift value to the start of the next field
+    physPos = atoi(tmpStr.c_str());
+
+    // Again, due to iterators, we are guaranteed to be in range of startPos and
+    // endPos
+    assert(physPos >= startPos && physPos <= endPos);
+
+    // read marker name:
+    markerName.clear();
+    for(c = 0; line.s[s+c] != '\t'; c++) // to end of the field
+      markerName += line.s[s+c];
+    s += c + 1; // update shift
+
+    // read reference allele:
+    alleles.clear();
+    for(c = 0; line.s[s+c] != '\t'; c++)
+      alleles += line.s[s+c];
+    alleles += ' ';
+    s += c + 1; // update shift
+
+    // read alternate alleles:
+    int numAlleles = 1;
+    for(c = 0; line.s[s+c] != '\t'; c++) {
+      if (line.s[s+c] == ',')
+	alleles += ' ';
+      else
+	alleles += line.s[s+c];
+      numAlleles++;
+    }
+    s += c + 1;
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Have data read, now make the Marker and do bookkeeping as needed
+
+    // Note: for VCFs, since we're using iterators, we don't need
+    // _firstStartMarkerIdx?
+
+    // Note: don't have genetic map distance here, so set from physical:
+    float morganDistToPrev = 1.0f;
+    if (prevMarker != NULL && chromIdx == prevMarker->_chromIdx) {
+      morganDistToPrev = (physPos - prevMarker->getPhysPos()) / (100 * 1000000);
+    }
+
+    // TODO: need the ability to read genetic map from other files, require it
+    // for VCFs
+
+    Marker *m = new Marker(markerName.c_str(), chromIdx, /*mapPos=*/ 0.0f,
+			   morganDistToPrev, physPos, alleles.c_str(),
+			   numAlleles);
+
+    if (prevMarker != NULL) {
+      int prevChromIdx = prevMarker->_chromIdx;
+      if (chromIdx == prevChromIdx) {
+	if (physPos == prevMarker->_physPos) {
+	  fprintf(stderr,
+		  "WARNING: marker %s has same position as previous marker\n",
+		  markerName.c_str());
+	}
+      }
+      else { // Have a valid prev chrom?  Update marker/chunk counts
+	// Note: numMarkersCurChrom actually applies to the previous chrom
+	updateInfoPrevChrom(prevChromIdx, numMarkersCurChrom);
+
+	numMarkersCurChrom = 0; // reset
+
+	int curMarkerNum = _allMarkers.length();
+	// about to append the first marker for this chrom to this index:
+	_firstMarkerNumX[chromIdx] = curMarkerNum;
+      }
+    }
+    
+    _allMarkers.append(m);
+    numMarkersCurChrom++;
+    prevMarker = m;
+  }
+  // done reading from the VCF, clean up
+  free(line.s);
+
+  // Set starting chunk for final chromosome:
+  if (prevMarker != NULL) {
+    int prevChromIdx = prevMarker->_chromIdx;
+    updateInfoPrevChrom(prevChromIdx, numMarkersCurChrom);
+  }
+}
+
 // Prints a .phsnp/.snp (PackedAncestryMap/Eigenstrat format) file
 void Marker::printSNPFile(FILE *out) {
   int numMarkers = _allMarkers.length();
   for(int m = 0; m < numMarkers; m++) {
     Marker *cur = _allMarkers[m];
+
+    if (cur->getNumAlleles() > 2)
+      // these .snp files only support biallelics: skip this marker
+      continue;
 
     // print SNP id
     int padSpaces = 20 - strlen(cur->_name);
@@ -79,10 +225,10 @@ void Marker::printSNPFile(FILE *out) {
     fprintf(out, "%s", cur->_name);
 
     // print chromosome
-    fprintf(out, "  ");
-    if (cur->_chrom < 10)
+    padSpaces = 4 - strlen(cur->getChromName());
+    for(int i = 0; i < padSpaces; i++)
       fprintf(out, " ");
-    fprintf(out, "%d", cur->_chrom);
+    fprintf(out, "%s", cur->getChromName());
 
     // print genetic position
     fprintf(out, "        %1.12f", cur->_mapPos);
@@ -94,7 +240,7 @@ void Marker::printSNPFile(FILE *out) {
     fprintf(out, "%d", cur->_physPos);
 
     // print alleles
-    fprintf(out, " %s\n", cur->_alleles);
+    fprintf(out, " %s\n", cur->_allelesX);
   }
 }
 
@@ -103,10 +249,14 @@ void Marker::printSNPFile(FILE *out) {
 void Marker::printImpute2Prefix(FILE *out, int markerNum) {
   Marker *cur = _allMarkers[markerNum];
 
+  if (cur->getNumAlleles() > 2)
+    // IMPUTE2 format only supports biallelic SNPs: skip
+    return;
+
   // IMPUTE2 format uses the opposite numerical encoding to Eigenstrat and
   // packed Ancestrymap formats, so we flip the allele order here:
-  fprintf(out, "%d %s %d %s", cur->getChrom(), cur->getName(),
-	  cur->getPhysPos(), cur->_alleles);
+  fprintf(out, "%s %s %d %s", cur->getChromName(), cur->getName(),
+	  cur->getPhysPos(), cur->_allelesX);
 }
 
 // Print, in gzipped format, the first 5 columns of an IMPUTE2 format .haps
@@ -114,37 +264,32 @@ void Marker::printImpute2Prefix(FILE *out, int markerNum) {
 void Marker::printGzImpute2Prefix(gzFile out, int markerNum) {
   Marker *cur = _allMarkers[markerNum];
 
+  if (cur->getNumAlleles() > 2)
+    // IMPUTE2 format only supports biallelic SNPs: skip
+    return;
+
   // IMPUTE2 format uses the opposite numerical encoding to Eigenstrat and
   // packed Ancestrymap formats, so we flip the allele order here:
-  gzprintf(out, "%d %s %d %s", cur->getChrom(), cur->getName(),
-	   cur->getPhysPos(), cur->_alleles);
+  gzprintf(out, "%s %s %d %s", cur->getChromName(), cur->getName(),
+	   cur->getPhysPos(), cur->_allelesX);
 }
 
-// Read marker/genetic map definition file
+// Read marker/genetic map definition file of the following formats:
 // If type == 1, reads Reich lab format .snp file
 // If type == 2, reads PLINK format .map file
 // If type == 3, reads PLINK format .bim file
-void Marker::readMarkers(FILE *in, int onlyChr, int type, int startPos,
+void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 			 int endPos) {
-  char markerName[256];
-  int chrom;
+  std::string markerName;
+  std::string chromName;
+  std::string tmpStr;
+  int chromIdx = -1;
   Marker *prevMarker = NULL;
   float mapPos;
   int physPos;
-  char alleles[2][256];
-
-  // Init the _last.. static arrays:
-  for(int c = 1; c <= LAST_CHROM; c++) {
-    _lastMarkerNum[c] = _lastHapChunk[c] = -1;
-  }
+  char alleles[4] = "Z Z"; // initially
 
   int numMarkersCurChrom = 0;
-
-  // What was the last chromosome number we printed a warning for?
-  int chromWarningPrintedFor = 0;
-
-  // Which chromosome number have we read markers for?
-  int readMarkersOnChrom = 0;
 
   // set genetic positions from physical?  Yes if all genetic positions are 0
   int setGenetFromPhys = -1;
@@ -153,24 +298,71 @@ void Marker::readMarkers(FILE *in, int onlyChr, int type, int startPos,
     // Note: I assume the map positions are in Morgans per the spec of both
     // the Reich lab SNP file format and the spec of the PLINK .map file format
     if (type == 1) {
-      int ret = fscanf(in, "%s %d %f %d %s %s", markerName, &chrom, &mapPos,
-		       &physPos, alleles[0], alleles[1]);
-      if (ret != 6) {
+      char c;
+      c = readToken(in, markerName); // read marker name
+      if (c == EOF) // done reading file
+	break;
+      readToken(in, chromName);  // read chromosome name
+      readToken(in, tmpStr);     // read map position, then convert to float
+      mapPos = atof(tmpStr.c_str());
+      readToken(in, tmpStr);     // read physical position, then convert to int
+      physPos = atoi(tmpStr.c_str());
+
+      // this loop ends when the allele gets read:
+      while(isspace(alleles[0] = fgetc(in))); // read first allele
+      c = fgetc(in);
+      if (c != ' ' && c != '\t') {
+	fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+	fprintf(stderr, "At marker %s\n", markerName.c_str());
+	exit(1);
+      }
+      // Note: index 1 is a space
+      while(isspace(alleles[2] = fgetc(in))); // read second allele
+
+      // read to the end of the line
+      while (isspace(c = fgetc(in)) && c != '\n' && c != EOF);
+
+      if (c == EOF)
 	break; // done reading file
+      else if (c != '\n') {
+	fprintf(stderr, "ERROR: extra characters on line for marker %s\n",
+		markerName.c_str());
+	exit(1);
       }
     }
-    else if (type == 2) {
-      int ret = fscanf(in, "%d %s %f %d", &chrom, markerName, &mapPos,
-		       &physPos);
-      if (ret != 4) {
-	break; // done reading file
+    else if (type == 2 || type == 3) {
+      char c;
+      c = readToken(in, chromName); // read chromosome
+      if (c == EOF) // done reading file
+	break;
+      readToken(in, markerName); // read marker name
+      readToken(in, tmpStr);     // read map position, then convert to float
+      mapPos = atof(tmpStr.c_str());
+      readToken(in, tmpStr);     // read physical position, then convert to int
+      physPos = atoi(tmpStr.c_str());
+
+      if (type == 3) { // for .bim files, must read alleles
+	// this loop ends when the allele gets read:
+	while(isspace(alleles[0] = fgetc(in))); // read first allele
+	c = fgetc(in);
+	if (c != ' ' && c != '\t') {
+	  fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+	  fprintf(stderr, "At marker %s\n", markerName.c_str());
+	  exit(1);
+	}
+	// Note: index 1 is a space
+	while(isspace(alleles[2] = fgetc(in))); // read second allele
       }
-    }
-    else if (type == 3) {
-      int ret = fscanf(in, "%d %s %f %d %s %s", &chrom, markerName, &mapPos,
-		       &physPos, alleles[0], alleles[1]);
-      if (ret != 6) {
+
+      // read to the end of the line
+      while (isspace(c = fgetc(in)) && c != '\n' && c != EOF);
+
+      if (c == EOF)
 	break; // done reading file
+      else if (c != '\n') {
+	fprintf(stderr, "ERROR: extra characters on line for marker %s\n",
+		markerName.c_str());
+	exit(1);
       }
     }
     else {
@@ -180,25 +372,15 @@ void Marker::readMarkers(FILE *in, int onlyChr, int type, int startPos,
 
     _numMarkersInFile++;
 
-    if (onlyChr > 0 && chrom != onlyChr) {
+    if (onlyChr != NULL && strcmp(chromName.c_str(), onlyChr) != 0) {
       // only keeping markers on <onlyChr> -- skip
-      continue;
-    }
-
-    if (chrom > LAST_CHROM) {
-      if (chrom > chromWarningPrintedFor) {
-	fprintf(stderr, "WARNING: marker on chrom %d, but code only supports up to %d\n",
-		chrom, LAST_CHROM);
-	fprintf(stderr, "Omitting markers on chrom %d\n", chrom);
-	chromWarningPrintedFor = chrom;
-      }
       continue;
     }
 
     // Is the physical position missing?  If so, omit this marker
     if (physPos == 0) {
       fprintf(stderr, "Omitting marker %s: missing physical position\n",
-	      markerName);
+	      markerName.c_str());
       if (_allMarkers.length() > 0) {
 	// only track omit markers when we have some markers prior to it that
 	// we *are* storing (i.e., when _allMarkers.length() > 0); those
@@ -215,20 +397,33 @@ void Marker::readMarkers(FILE *in, int onlyChr, int type, int startPos,
       continue;
     }
 
-    if (_allMarkers.length() == 0) {
-      _firstStoredMarkerIdx = _numMarkersInFile - 1;
-      readMarkersOnChrom = chrom;
+    // same chromosome as the previous marker?
+    if (chromIdx < 0 || strcmp(chromName.c_str(), _chromNames[chromIdx]) != 0) {
+      // new chromosome
+      if (chromIdx >= 0 && _readOnlyOneChrom) {
+	printf("\n\n");
+	printf("ERROR: markers present from multiple chromosomes/contigs.\n");
+	printf("Please specify a chromosome to process with --chr\n");
+	exit(1);
+      }
+
+      char *newChrom = new char[ chromName.length() + 1 ]; // + 1 due to '\0'
+      strcpy(newChrom, chromName.c_str());
+      _chromNames.append(newChrom);
+      chromIdx = _chromNames.length() - 1;
+
+      _firstMarkerNumX.append(0);
+      _lastMarkerNumX.append(-1);
+      _firstHapChunkX.append(0);
+      _lastHapChunkX.append(-1);
     }
 
-    if (readMarkersOnChrom != chrom && _readOnlyOneChrom) {
-      printf("\n\n");
-      printf("ERROR: markers present from multiple chromosomes.\n");
-      printf("Please specify a chromosome number to process with the --chr option\n");
-      exit(1);
+    if (_allMarkers.length() == 0) {
+      _firstStoredMarkerIdx = _numMarkersInFile - 1;
     }
 
     float morganDistToPrev = 1.0f;
-    if (prevMarker != NULL && chrom == prevMarker->_chrom) {
+    if (prevMarker != NULL && chromIdx == prevMarker->_chromIdx) {
       // on second marker? update setGenetFromPhys
       if (_allMarkers.length() == 1) {
 	if (prevMarker->getMapPos() == 0.0f && mapPos == 0.0f) {
@@ -252,18 +447,24 @@ void Marker::readMarkers(FILE *in, int onlyChr, int type, int startPos,
 	morganDistToPrev = mapPos - prevMarker->getMapPos();
       }
     }
-    Marker *m = new Marker(markerName, chrom, mapPos, morganDistToPrev, physPos,
-			   (type == 2) ? NULL : alleles);
+    // Note: if alleles == NULL, the numAlleles argument will be ignored
+    Marker *m = new Marker(markerName.c_str(), chromIdx, mapPos,
+			   morganDistToPrev, physPos,
+			   (type == 2) ? NULL : alleles, /*numAlleles=*/ 2);
 
     if (prevMarker != NULL) {
-      int prevChrom = prevMarker->_chrom;
-      if (chrom == prevChrom) {
+      int prevChromIdx = prevMarker->_chromIdx;
+      if (chromIdx == prevChromIdx) {
 	if (mapPos < prevMarker->_mapPos || physPos < prevMarker->_physPos) {
-	  fprintf(stderr, "ERROR: marker %s has position before previous marker!\n", markerName);
+	  fprintf(stderr,
+		  "ERROR: marker %s has position before previous marker!\n",
+		  markerName.c_str());
 	  exit(1);
 	}
 	else if (physPos == prevMarker->_physPos) {
-	  fprintf(stderr, "WARNING: marker %s has same position as previous marker\n", markerName);
+	  fprintf(stderr,
+		  "WARNING: marker %s has same position as previous marker\n",
+		  markerName.c_str());
 	}
 
 	// For hotspot-based windows selection
@@ -283,19 +484,14 @@ void Marker::readMarkers(FILE *in, int onlyChr, int type, int startPos,
 //	}
       }
       else { // Have a valid prev chrom?  Update marker/chunk counts
-	if (chrom < prevChrom) {
-	  printf("ERROR: chromosomes must be listed in ascending order\n");
-	  exit(1);
-	}
-
 	// Note: numMarkersCurChrom actually applies to the previous chrom
-	updateInfoPrevChrom(prevChrom, numMarkersCurChrom);
+	updateInfoPrevChrom(prevChromIdx, numMarkersCurChrom);
 
 	numMarkersCurChrom = 0; // reset
 
 	int curMarkerNum = _allMarkers.length();
 	// about to append the first marker for this chrom to this index:
-	_firstMarkerNum[chrom] = curMarkerNum;
+	_firstMarkerNumX[chromIdx] = curMarkerNum;
       }
     }
 
@@ -306,9 +502,28 @@ void Marker::readMarkers(FILE *in, int onlyChr, int type, int startPos,
 
   // Set starting chunk for final chromosome:
   if (prevMarker != NULL) {
-    int prevChrom = prevMarker->_chrom;
-    updateInfoPrevChrom(prevChrom, numMarkersCurChrom);
+    int prevChromIdx = prevMarker->_chromIdx;
+    updateInfoPrevChrom(prevChromIdx, numMarkersCurChrom);
   }
+}
+
+// Reads a string from <in>, skipping any leading whitespace, and returning
+// the whitespace character after the token to the caller
+char Marker::readToken(FILE *in, std::string &toStr) {
+  char c;
+  while ((c = fgetc(in)) && (c == ' ' || c == '\t')); // read leading whitespace
+
+  if (c == EOF)
+    return c;
+
+  toStr.clear();
+
+  // read past the whitespace, so add the last read character to the string
+  toStr += c;
+  while (!isspace(c = fgetc(in)) && c != EOF) // keep reading until whitespace
+    toStr += c;
+
+  return c;
 }
 
 // Updates the size and location of windows so that the first window starts
@@ -353,9 +568,9 @@ void Marker::updateWindowsMap(int initOffset, float windowLengthMorgans,
       windowStartMorg = curMapPos;
     }
     else {
-      int prevChrom = prevMarker->_chrom;
-      if (curMarker->_chrom != prevChrom) {
-	assert(curMarker->_chrom > prevChrom);
+      int prevChromIdx = prevMarker->_chromIdx;
+      if (curMarker->_chromIdx != prevChromIdx) {
+	assert(curMarker->_chromIdx > prevChromIdx);
 
 	// note: window *won't* include the current marker
 	setNumMarkersInWindow(windowStartIdx, m - windowStartIdx);
@@ -408,16 +623,17 @@ void Marker::updateWindowsMap(int initOffset, float windowLengthMorgans,
   setNumMarkersInWindow(windowStartIdx, curMarkerNum - windowStartIdx);
 }
 
-// Sets the last marker number for <prevChrom> along with the first and last
+// Sets the last marker number for <prevChromIdx> along with the first and last
 // chunk numbers
-void Marker::updateInfoPrevChrom(int prevChrom, int numMarkersPrevChrom) {
-  _lastMarkerNum[prevChrom] = _allMarkers.length() - 1;
+void Marker::updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom) {
+  _lastMarkerNumX[prevChromIdx] = _allMarkers.length() - 1;
   // Note: _numHapChunks is presently 1 more than the final chunk index for the
-  // chromosome before <prevChrom>, i.e., exactly the first index we need here:
-  _firstHapChunk[prevChrom] = _numHapChunks;
+  // chromosome before <prevChromIdx>, i.e., exactly the first index we need
+  // here:
+  _firstHapChunkX[prevChromIdx] = _numHapChunks;
   // Update the total number of haplotype chunks:
   _numHapChunks += getNumHapChunksFor(numMarkersPrevChrom);
-  _lastHapChunk[prevChrom] = _numHapChunks - 1;
+  _lastHapChunkX[prevChromIdx] = _numHapChunks - 1;
 }
 
 // Stores the number of markers within the 0.25cM window: corrects for marker
@@ -449,71 +665,66 @@ int Marker::getChunkModMarkers(int numMarkers) {
   return numMarkers % BITS_PER_CHUNK;
 }
 
-int Marker::getFirstMarkerNumForChunk(int chrom, int chunkNum) {
-  int numChunksIntoChrom = chunkNum - getFirstHapChunk(chrom);
-  return getFirstMarkerNum(chrom) + (BITS_PER_CHUNK * numChunksIntoChrom);
+int Marker::getFirstMarkerNumForChunkX(int chromIdx, int chunkNum) {
+  int numChunksIntoChrom = chunkNum - getFirstHapChunkX(chromIdx);
+  return getFirstMarkerNumX(chromIdx) + (BITS_PER_CHUNK * numChunksIntoChrom);
 }
 
 // Returns the total physical length of the markers that were input
-uint32_t Marker::getTotalPhysLength(bool analyzeChrX) {
-  uint32_t total = 0;
-  // Note: we only include the autosomes and optionally the X chromosome in this
-  // we don't include Y, PAR, or MT
-  int lastChr = CHR_LAST_AUTOSOME;
-  if (analyzeChrX)
-    lastChr = CHR_X;
-  for (int chrom = 1; chrom <= lastChr; chrom++) {
-    if (Marker::getNumChromMarkers(chrom) == 0)
-      continue;
-
-    const Marker *firstMarker =
-			  Marker::getMarker( Marker::getFirstMarkerNum(chrom) );
-    const Marker *lastMarker =
-			  Marker::getMarker( Marker::getLastMarkerNum(chrom) );
-    total += lastMarker->getPhysPos() - firstMarker->getPhysPos();
-  }
-  return total;
-}
+//uint32_t Marker::getTotalPhysLength(bool analyzeChrX) {
+//  uint32_t total = 0;
+//  // Note: we only include the autosomes and optionally the X chromosome in this
+//  // we don't include Y, PAR, or MT
+//  int lastChr = CHR_LAST_AUTOSOME;
+//  if (analyzeChrX)
+//    lastChr = CHR_X;
+//  for (int chrom = 1; chrom <= lastChr; chrom++) {
+//    if (Marker::getNumChromMarkers(chrom) == 0)
+//      continue;
+//
+//    const Marker *firstMarker =
+//			  Marker::getMarker( Marker::getFirstMarkerNum(chrom) );
+//    const Marker *lastMarker =
+//			  Marker::getMarker( Marker::getLastMarkerNum(chrom) );
+//    total += lastMarker->getPhysPos() - firstMarker->getPhysPos();
+//  }
+//  return total;
+//}
 
 // Returns the total genetic length (in Morgans) of the markers that were input
-float Marker::getTotalGenetLength(bool analyzeChrX) {
-  float total = 0.0f;
-  // Note: we only include the autosomes and optionally the X chromosome in this
-  // we don't include Y, PAR, or MT
-  int lastChr = CHR_LAST_AUTOSOME;
-  if (analyzeChrX)
-    lastChr = CHR_X;
-  for (int chrom = 1; chrom <= lastChr; chrom++) {
-    if (Marker::getNumChromMarkers(chrom) == 0)
-      continue;
+//float Marker::getTotalGenetLength(bool analyzeChrX) {
+//  float total = 0.0f;
+//  // Note: we only include the autosomes and optionally the X chromosome in this
+//  // we don't include Y, PAR, or MT
+//  int lastChr = CHR_LAST_AUTOSOME;
+//  if (analyzeChrX)
+//    lastChr = CHR_X;
+//  for (int chrom = 1; chrom <= lastChr; chrom++) {
+//    if (Marker::getNumChromMarkers(chrom) == 0)
+//      continue;
+//
+//    const Marker *firstMarker =
+//			  Marker::getMarker( Marker::getFirstMarkerNum(chrom) );
+//    const Marker *lastMarker =
+//			  Marker::getMarker( Marker::getLastMarkerNum(chrom) );
+//    total += lastMarker->getMapPos() - firstMarker->getMapPos();
+//  }
+//  return total;
+//}
 
-    const Marker *firstMarker =
-			  Marker::getMarker( Marker::getFirstMarkerNum(chrom) );
-    const Marker *lastMarker =
-			  Marker::getMarker( Marker::getLastMarkerNum(chrom) );
-    total += lastMarker->getMapPos() - firstMarker->getMapPos();
-  }
-  return total;
-}
-
-
-Marker::Marker(char *markerName, int chrom, float mapPos,
-	       float morganDistToPrev, int physPos, char (*alleles)[256]) {
+Marker::Marker(const char *markerName, int chromIdx, float mapPos,
+	       float morganDistToPrev, int physPos, const char *alleles,
+	       int numAlleles) {
   _name = new char[strlen(markerName)+1];
   strcpy(_name, markerName);
-  _chrom = chrom;
+  _chromIdx = chromIdx;
   _physPos = physPos;
   _mapPos = mapPos;
+
   if (alleles != NULL) {
-    // note: +2 since array needs 1 slot for space char and 1 more for '\0':
-    if (strlen(alleles[0]) + strlen(alleles[1]) + 2 > MAX_ALLELES) {
-      fprintf(stderr, "ERROR: alleles at marker %s are too many characters long\n",
-	      markerName);
-      fprintf(stderr, "       can change MAX_ALLELES and recompile to fix\n");
-      exit(2);
-    }
-    sprintf(_alleles, "%s %s", alleles[0], alleles[1]);
-    _numAlleles = 2;
+    _allelesX = new char[ strlen(alleles) + 1 ]; // +1 for '\0'
+    strcpy(_allelesX, alleles);
+    _numAlleles = numAlleles;
   }
   else {
     _numAlleles = 0;
@@ -533,19 +744,3 @@ void Marker::setAlleleFreq(int alleleCount, int totalGenoWithData) {
   _logAlleleFreq = log( referenceFrequency );
   _logVarAlleleFreq = log( variantFrequency );
 }
-
-// No longer necessary:
-//void Marker::addMarkerGenotype(int markerNum, int genotype) {
-//  if (genotype != 9) { // as long as it's not missing data:
-//    // note: a value of 0 is two major alleles, and a genotype of 2 is 0 major
-//    // alleles
-//    Marker *theMarker = _allMarkers[markerNum];
-//    theMarker->_majAlleleCount += 2 - genotype;
-//    theMarker->_totalAlleles += 2;
-//  }
-//}
-//
-//float Marker::getAlleleFreq(int markerNum) {
-//  Marker *theMarker = _allMarkers[markerNum];
-//  return (float) theMarker->_majAlleleCount / theMarker->_totalAlleles;
-//}

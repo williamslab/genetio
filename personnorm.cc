@@ -19,13 +19,12 @@ PersonNorm::PersonNorm(char *id, char gender,int popIndex,
 		       short familyIdLength) : 
 		     SuperPerson(id, gender, popIndex, familyIdLength) {
   if (!_ignore) {
-    for(int c = 1; c <= LAST_CHROM; c++) {
-      int numChrMarkers = Marker::getNumChromMarkers(c);
-      if (numChrMarkers > 0) {
-	_geno[c] = new Genotype[numChrMarkers];
-      }
-      else
-	_geno[c] = NULL;
+    int numChroms = Marker::getNumChroms();
+    _genoX = new Genotype *[numChroms];
+    for(int c = 0; c < numChroms; c++) {
+      int numChrMarkers = Marker::getNumChromMarkersX(c);
+      assert(numChrMarkers > 0);
+      _genoX[c] = new Genotype[numChrMarkers];
     }
 
     _parents[0] = _parents[1] = NULL;
@@ -41,20 +40,20 @@ PersonNorm::PersonNorm(char *id, char gender,int popIndex,
 
 PersonNorm::~PersonNorm() {
   if (!_ignore) {
-    for(int c = 1; c <= LAST_CHROM; c++) {
-      if (_geno[c] != NULL)
-	delete [] _geno[c];
+    int numChroms = Marker::getNumChroms();
+    for(int c = 0; c < numChroms; c++) {
+      delete [] _genoX[c];
     }
   }
 }
 
-void PersonNorm::setGenotype(int hapChunkNum, int chunkIdx, int chrom,
+void PersonNorm::setGenotypeX(int hapChunkNum, int chunkIdx, int chromIdx,
 			     int chromMarkerIdx, int geno[2]) {
   if (_ignore)
     return; // no need/nowhere to store genotypes
 
   for(int h = 0; h < 2; h++)
-    _geno[chrom][chromMarkerIdx][h] = geno[h];
+    _genoX[chromIdx][chromMarkerIdx][h] = geno[h];
 }
 
 // Given the parents of <this>, sets pointers to those parents in

@@ -3,19 +3,16 @@
 //
 // This program is distributed under the terms of the GNU General Public License
 
+#include <stdint.h>
 #include <zlib.h>
+#include <string>
+#include <htslib/hts.h>
+#include <htslib/tbx.h>
 #include "hapi-ur-util.h"
 #include "dynarray.h"
 
 #ifndef MARKER_H
 #define MARKER_H
-
-#define CHR_LAST_AUTOSOME  22
-#define CHR_X		   23
-#define CHR_Y              24
-#define CHR_PAR            25
-#define CHR_MT             26
-#define LAST_CHROM         CHR_MT
 
 
 // Determines the size of the _alleles character string.  Want this to be
@@ -32,34 +29,40 @@ class Marker {
 
     static void setReadOnlyOneChrom() { _readOnlyOneChrom = true; }
     static bool getReadOnlyOneChrom() { return _readOnlyOneChrom; }
-    static void readSNPFile(const char *snpFile, int onlyChr, int startPos,
-			    int endPos);
-    static void readMapFile(const char *mapFile, int onlyChr, int startPos,
-			    int endPos);
-    static void readBIMFile(const char *bimFile, int onlyChr, int startPos,
-			    int endPos);
+    static void readSNPFile(const char *snpFile, const char *onlyChr,
+			    int startPos, int endPos);
+    static void readMapFile(const char *mapFile, const char *onlyChr,
+			    int startPos, int endPos);
+    static void readBIMFile(const char *bimFile, const char *onlyChr,
+			    int startPos, int endPos);
+    static void readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
+			    int startPos, int endPos);
     static void printSNPFile(FILE *out);
     static void printImpute2Prefix(FILE *out, int markerNum);
     static void printGzImpute2Prefix(gzFile out, int markerNum);
 
+    static int getNumChroms()  { return _chromNames.length(); }
     static int getNumMarkers() { return _allMarkers.length(); }
     static int getNumMarkersInFile() { return _numMarkersInFile; }
     static int getFirstStoredMarkerFileIdx() { return _firstStoredMarkerIdx; }
-    static int getFirstMarkerNum(int chrom) { return _firstMarkerNum[chrom]; }
-    static int getLastMarkerNum(int chrom)  { return _lastMarkerNum[chrom]; }
-    static const Marker * getFirstMarker(int chrom)
-			    { return getMarker( getFirstMarkerNum(chrom) ); }
-    static int getNumChromMarkers(int chrom)
-		{ return _lastMarkerNum[chrom] - _firstMarkerNum[chrom] + 1; }
+    // TODO: remove Xs
+    static int getFirstMarkerNumX(int chromIdx)
+					  { return _firstMarkerNumX[chromIdx]; }
+    static int getLastMarkerNumX(int chromIdx)
+					  { return _lastMarkerNumX[chromIdx]; }
+//    static const Marker * getFirstMarker(int chrom)
+//			    { return getMarker( getFirstMarkerNum(chrom) ); }
+    static int getNumChromMarkersX(int chromIdx)
+	    { return _lastMarkerNumX[chromIdx] - _firstMarkerNumX[chromIdx] + 1; }
 
     static int getNumHapChunks() { return _numHapChunks; }
-    static int getFirstHapChunk(int chrom) { return _firstHapChunk[chrom]; }
-    static int getLastHapChunk(int chrom)  { return _lastHapChunk[chrom]; }
+    static int getFirstHapChunkX(int chromIdx) {return _firstHapChunkX[chromIdx];}
+    static int getLastHapChunkX(int chromIdx)  {return _lastHapChunkX[chromIdx];}
     static int getNumHapChunksFor(int numMarkers);
     // Returns the number of markers not divisible by the num of bits in a chunk
     static int getChunkModMarkers(int numMarkers);
 
-    static int getFirstMarkerNumForChunk(int chrom, int chunkNum);
+    static int getFirstMarkerNumForChunkX(int chromIdx, int chunkNum);
 
     static const Marker * getMarker(int num) { return _allMarkers[num]; }
 
@@ -73,8 +76,8 @@ class Marker {
     static void   updateWindows(int initOffset, int windowNumMarkers);
     static void   updateWindowsMap(int initOffset, float windowLengthMorgans,
 				   int minNumMarkers);
-    static uint32_t getTotalPhysLength(bool analyzeChrX);
-    static float    getTotalGenetLength(bool analyzeChrX);
+//    static uint32_t getTotalPhysLength(bool analyzeChrX);
+//    static float    getTotalGenetLength(bool analyzeChrX);
     
     static const dynarray<int> & getMarkersToOmit() { return _omitMarkers; }
 
@@ -83,14 +86,12 @@ class Marker {
     //////////////////////////////////////////////////////////////////
 
     const char * getName() const  { return _name; }
-    int   getChrom() const        { return _chrom; }
+    int   getChromIdx() const     { return _chromIdx; }
+    const char * getChromName() const { return _chromNames[ _chromIdx ]; }
     float getMapPos() const       { return _mapPos; }
     int   getPhysPos() const      { return _physPos; }
-    char  getAllele(int i) const  { return _alleles[i]; }
+    const char * getAlleleStr() const  { return _allelesX; }
     short getNumAlleles() const   { return _numAlleles; }
-    void  addAllele(char a)       { assert(_numAlleles < MAX_ALLELES);
-				    _alleles[(short)_numAlleles] = a;
-				    _numAlleles++; }
     // Note: these values do not get initialized for .ped files for which SNPs
     // are read in an awkward order for this calculation to be done while
     // reading
@@ -101,24 +102,22 @@ class Marker {
 
 
   private:
-    Marker(char *markerName, int chrom, float mapPos, float morganDistToPrev,
-	   int physPos, char (*alleles)[256]);
+    Marker(const char *markerName, int chromIdx, float mapPos,
+	   float morganDistToPrev, int physPos, const char *alleles,
+	   int numAlleles);
 
     //////////////////////////////////////////////////////////////////
     // private static methods
     //////////////////////////////////////////////////////////////////
 
-    static void readMarkers(FILE *in, int onlyChr, int type, int startPos,
-			    int endPos);
-    static void updateInfoPrevChrom(int prevChrom, int numMarkersPrevChrom);
+    static void readMarkers(FILE *in, const char *onlyChr, int type,
+			    int startPos, int endPos);
+    static void updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom);
     static void setNumMarkersInWindow(int startMarkerNum, int numMarkers);
-
+    static char readToken(FILE *in, std::string &toStr);
 
     // marker name (usually SNP rs id)
     char *_name;
-
-    // chromosome
-    int _chrom;
 
     // physical position:
     int _physPos;
@@ -126,10 +125,14 @@ class Marker {
     // genetic position (map distance):
     float _mapPos;
 
-    // Alleles; for bi-allelic SNPs, these are stored as a single string with
-    // a space separating the two types.
-    char _alleles[MAX_ALLELES];
-    char _numAlleles;
+    // Alleles; stored as a single string with a space separating the types.
+    // TODO: take off all the X's
+    char *_allelesX;
+    uint8_t _numAlleles;
+
+    // chromosome
+    // TODO: add check to ensure uint8_t is big enough
+    uint8_t _chromIdx;
 
     // Number of SNPs in this window (changes as HAPI-UR program runs)
     short _numSNPsWindow;
@@ -168,21 +171,24 @@ class Marker {
     // checking the reported values in a packed ancestrymap format file):
     static int _numMarkersInFile;
 
+    // Stores the chromosome/contig names for all that have been read in
+    static dynarray<char *> _chromNames;
+
     // Stores the first marker number on the corresponding chromosome number
     // 1..23, 0 if no markers on chrom
-    static int _firstMarkerNum[LAST_CHROM + 1];
+    static dynarray<int> _firstMarkerNumX;
 
     // Stores the last marker number on the corresponding chromosome number
     // 1..23, 0 if no markers on chrom
-    static int _lastMarkerNum[LAST_CHROM + 1];
+    static dynarray<int> _lastMarkerNumX;
 
     // Stores the starting haplotype chunk number for each chromosome, 0 if
     // no markers on chrom
-    static int _firstHapChunk[LAST_CHROM + 1];
+    static dynarray<int> _firstHapChunkX;
 
     // Stores the last haplotype chunk number for each chromosome, 0 if no
     // markers on chrom
-    static int _lastHapChunk[LAST_CHROM + 1];
+    static dynarray<int> _lastHapChunkX;
 
     // Number of haplotype chunks to store the data.  We store the haplotypes as
     // ulint type variables, with one locus per bit, so this number is the

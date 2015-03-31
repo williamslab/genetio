@@ -84,7 +84,7 @@ class PersonBits : public SuperPerson {
 	  { return _knownHap[chunkNum] & _homozyLoci[chunkNum]; }
     chunk getMissingLoci(int chunkNum)
 	  { return _missingLoci[chunkNum]; }
-    int   getGenotype(int chunkNum, int chunkIdx, int chrom,
+    int   getGenotypeX(int chunkNum, int chunkIdx, int chromIdx,
 		      int chromMarkerIdx)
 		     { return getGenotype(chunkNum, chunkIdx); }
     int   getGenotype(int chunkNum, int chunkIdx) {
@@ -102,14 +102,14 @@ class PersonBits : public SuperPerson {
  
       return alleleCount;
     }
-    int getHapAllele(int homolog, int chunkNum, int chunkIdx, int chrom,
+    int getHapAlleleX(int homolog, int chunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx) {
       if (getTrioDuoType() == TRIO_CHILD) {
 	PersonBits *parent = (PersonBits *) _tdData;
 	if (homolog == 1) // other parent?
 	  parent = parent->getTrioDuoOther();
 
-	return parent->getHapAllele(0, chunkNum, chunkIdx, chrom,
+	return parent->getHapAlleleX(0, chunkNum, chunkIdx, chromIdx,
 				    chromMarkerIdx);
       }
 
@@ -182,7 +182,7 @@ class PersonBits : public SuperPerson {
     // private methods
     //////////////////////////////////////////////////////////////////
 
-    void setGenotype(int hapChunkNum, int chunkIdx, int chrom,
+    void setGenotypeX(int hapChunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx, int geno[2]);
     void setMissing(int hapChunkNum, int chunkIdx);
     void setParents(char *familyid, PersonBits *parents[2],
