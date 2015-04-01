@@ -15,9 +15,9 @@ Hashtable<char *, PersonNorm *> PersonNorm::_idToPerson(2003, stringHash,
 							stringcmp);
 
 
-PersonNorm::PersonNorm(char *id, char gender,int popIndex,
+PersonNorm::PersonNorm(char *id, char sex,int popIndex,
 		       short familyIdLength) : 
-		     SuperPerson(id, gender, popIndex, familyIdLength) {
+		     SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
     int numChroms = Marker::getNumChroms();
     _genoX = new Genotype *[numChroms];

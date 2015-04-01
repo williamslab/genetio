@@ -13,9 +13,9 @@
 dynarray<const char *> SuperPerson::_popLabels;
 int SuperPerson::_maxPersonIdLength = 0;
 int SuperPerson::_numMales = 0;
-int SuperPerson::_numGenderUnknown = 0;
+int SuperPerson::_numSexUnknown = 0;
 
-SuperPerson::SuperPerson(char *id, char gender, int popIndex,
+SuperPerson::SuperPerson(char *id, char sex, int popIndex,
 			 short familyIdLength) {
   _popIndex = popIndex;
   _ignore = (_popIndex == -1) ? true : false;
@@ -26,14 +26,14 @@ SuperPerson::SuperPerson(char *id, char gender, int popIndex,
     _id = new char[ idLength + 1 ];
     strcpy(_id, id);
     _familyIdLength = familyIdLength;
-    _gender = gender;
+    _sex = sex;
 
-    if (_gender == 'M')
+    if (_sex == 'M')
       _numMales++;
-    else if (_gender == 'U')
-      _numGenderUnknown++;
-    else if (_gender != 'F') {
-      fprintf(stderr, "\nERROR: unknown gender %c for id %s!\n", _gender,
+    else if (_sex == 'U')
+      _numSexUnknown++;
+    else if (_sex != 'F') {
+      fprintf(stderr, "\nERROR: unknown sex %c for id %s!\n", _sex,
 	      _id);
       exit(4);
     }

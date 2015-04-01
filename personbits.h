@@ -68,7 +68,7 @@ class PersonBits : public SuperPerson {
     // public methods
     //////////////////////////////////////////////////////////////////
 
-    PersonBits(char *id, char gender, int popIndex, short familyIdLength = 0);
+    PersonBits(char *id, char sex, int popIndex, short familyIdLength = 0);
     ~PersonBits();
 
     void empty();

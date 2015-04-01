@@ -152,14 +152,14 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 
   // TODO: fix this
   bool analyzingX = strcmp(Marker::getMarker(0)->getChromName(), XchrName) == 0;
-  if (analyzingX && P::_numGenderUnknown > 0) {
+  if (analyzingX && P::_numSexUnknown > 0) {
     for (int o = 0; o < 2; o++) {
       FILE *out = outs[o];
       if (out == NULL)
 	continue;
-      fprintf(out, "ERROR: unspecified gender for %d individuals\n",
-	      P::_numGenderUnknown);
-      fprintf(out, "       analysis of X chromosome requires genders\n");
+      fprintf(out, "ERROR: unspecified sex for %d individuals\n",
+	      P::_numSexUnknown);
+      fprintf(out, "       analysis of X chromosome requires sex\n");
     }
     exit(3);
   }
@@ -200,7 +200,7 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
     int length = P::_allIndivs.length();
     for(int p = 0; p < length; p++) {
       P *cur = P::_allIndivs[p];
-      if (cur->getGender() == 'M') {
+      if (cur->getSex() == 'M') {
 	int numHets, numCalls;
 	// TODO: want to call this regardless of whether we're analyzing X alone
 	// or if it is read with everything else
@@ -448,9 +448,9 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
 template <class P>
 void PersonIO<P>::readIndivs(FILE *in) {
   char id[81], pop[81];
-  char gender;
+  char sex;
 
-  while (fscanf(in, "%80s %c %80s", id, &gender, pop) == 3) {
+  while (fscanf(in, "%80s %c %80s", id, &sex, pop) == 3) {
     // find pop index for the string <pop>
     int popIndex;
     if (strcmp(pop, "Ignore") == 0)
@@ -469,7 +469,7 @@ void PersonIO<P>::readIndivs(FILE *in) {
 	P::_popLabels.append( newPopLabel );
       }
     }
-    P *p = new P(id, gender, popIndex);
+    P *p = new P(id, sex, popIndex);
 
     P::_allIndivs.append(p);
   }
@@ -799,7 +799,7 @@ void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
       if (parents[p] == NULL)
 	continue;
 
-      if (p == 0 && parents[p] != NULL && parents[p]->getGender() == 'F') {
+      if (p == 0 && parents[p] != NULL && parents[p]->getSex() == 'F') {
 	if (!warningPrinted) {
 	  printf("\n");
 	  if (log != NULL) fprintf(log, "\n");
@@ -811,7 +811,7 @@ void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
 	  fprintf(log, "WARNING: father id %s is listed as female elsewhere\n",
 		  parents[p]->getId());
       }
-      if (p == 1 && parents[p] != NULL && parents[p]->getGender() == 'M') {
+      if (p == 1 && parents[p] != NULL && parents[p]->getSex() == 'M') {
 	if (!warningPrinted) {
 	  printf("\n");
 	  if (log != NULL) fprintf(log, "\n");
@@ -1395,7 +1395,7 @@ void PersonIO<P>::printPhasedIndFile(FILE *out, bool trioDuoOnly) {
 	fprintf(out, " ");
       }
       fprintf(out, "%s%s   %c   %s\n", thePerson->getId(),
-	      (h == 0) ? "_A" : "_B", thePerson->getGender(),
+	      (h == 0) ? "_A" : "_B", thePerson->getSex(),
 	      P::_popLabels[ thePerson->getPopIndex() ]);
     }
   }

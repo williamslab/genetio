@@ -18,9 +18,9 @@ dynarray<PersonBits *> PersonBits::_allIndivs;
 Hashtable<char *, PersonBits *> PersonBits::_idToPerson(2003, stringHash,
 							stringcmp);
 
-PersonBits::PersonBits(char *id, char gender, int popIndex,
+PersonBits::PersonBits(char *id, char sex, int popIndex,
 		       short familyIdLength) :
-		       SuperPerson(id, gender, popIndex, familyIdLength) {
+		       SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
     // Will update _trioDuoType and _tdData later as we read in relationships
     _trioDuoType = UNRELATED;
@@ -665,7 +665,7 @@ void PersonBits::setMissing(int hapChunkNum, int chunkIdx) {
 void PersonBits::setXHetToMissing(int *numHets, int *numCalls) {
 //  assert(Marker::getMarker(0)->getChrom() == CHR_X);
 //  assert(Marker::getNumChromMarkers(CHR_X) == Marker::getNumMarkers());
-  assert(getGender() == 'M');
+  assert(getSex() == 'M');
 
   if (numHets != NULL) {
     assert(numCalls != NULL);

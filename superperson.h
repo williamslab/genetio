@@ -15,21 +15,21 @@ class SuperPerson {
     // public methods
     //////////////////////////////////////////////////////////////////
 
-    SuperPerson(char *id, char gender, int popIndex, short familyIdLength);
+    SuperPerson(char *id, char sex, int popIndex, short familyIdLength);
     virtual ~SuperPerson();
 
     void setIgnore() {
       _ignore = true;
-      if (_gender == 'M')
+      if (_sex == 'M')
 	_numMales--;
-      else if (_gender == 'U')
-	_numGenderUnknown--;
+      else if (_sex == 'U')
+	_numSexUnknown--;
     }
 
     const char *getId() { return _id; }
     const short getFamilyIdLength() { return _familyIdLength; }
     const char *getPopLabel() { return _popLabels[_popIndex];}
-    char getGender() { return _gender; }
+    char getSex() { return _sex; }
     int getPopIndex() { return _popIndex; }
     virtual int getGenotypeX(int chunkNum, int chunkIdx, int chromIdx,
 			    int chromMarkerIdx) = 0;
@@ -47,7 +47,7 @@ class SuperPerson {
     static dynarray<const char *> _popLabels;
     static int _maxPersonIdLength;
     // need these two numbers for X chromosome phasing/checking
-    static int _numMales, _numGenderUnknown;
+    static int _numMales, _numSexUnknown;
 
   protected:
     //////////////////////////////////////////////////////////////////
@@ -74,8 +74,8 @@ class SuperPerson {
     // The index number of the population for this PersonBits
     short _popIndex;
 
-    // Gender for person -- 'M', 'F', or 'U'
-    char _gender;
+    // Sex for person -- 'M', 'F', or 'U'
+    char _sex;
 
     // True if the individual should be ignored.  To be ignored,
     // PersonIO<PersonBits>::removeIgnoreIndivs() should be called on the list

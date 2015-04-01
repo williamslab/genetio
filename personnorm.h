@@ -32,7 +32,7 @@ class PersonNorm : public SuperPerson {
     // public methods
     //////////////////////////////////////////////////////////////////
 
-    PersonNorm(char *id, char gender, int popIndex, short familyIdLength = 0);
+    PersonNorm(char *id, char sex, int popIndex, short familyIdLength = 0);
     ~PersonNorm();
 
     int getGenotypeX(int chunkNum, int chunkIdx, int chromIdx,
