@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <zlib.h>
+#include <htslib/hts.h>
+#include <htslib/tbx.h>
 #include "dynarray.h"
 #include "hashtable.h"
 
@@ -38,6 +40,7 @@ class PersonIO {
 				  int *numMendelError = NULL,
 				  int *numMendelCounted = NULL);
     static void removeIgnoreIndivs();
+
     static void printEigenstratGeno(FILE *out);
     static void printEigenstratPhased(FILE *out, int numSamples = -1);
     static void printGzEigenstratPhased(gzFile out);
@@ -45,9 +48,12 @@ class PersonIO {
     static void printImpute2Haps(FILE *out);
     static void printGzImpute2Haps(gzFile out);
     static void printImpute2SampleFile(FILE *out, bool trioDuoOnly = false);
+
     static void parsePackedAncestryMapFormat(FILE *in);
     static void parseEigenstratFormat(FILE *in);
     static void parsePlinkBedFormat(FILE *in);
+    static void parseVCFGenotypes(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
+				  const char *vcfFile, FILE *outs[2]);
 
   private:
     //////////////////////////////////////////////////////////////////

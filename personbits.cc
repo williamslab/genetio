@@ -630,10 +630,10 @@ void PersonBits::setGenotypeX(int hapChunkNum, int chunkIdx, int chromIdx,
     _missingLoci[hapChunkNum] += 1ul << chunkIdx;
     return;
   }
-  if (geno[0] == 0 && geno[1] == 1)
+  if ((geno[0] == 0 && geno[1] == 1) || (geno[0] == 1 && geno[1] == 0))
     return; // heterozygote => do nothing
 
-  assert(geno[0] == geno[1] && geno[0] <= 1);
+  assert(geno[0] <= 1 && geno[1] <= 1);
 
   // have homozygote: need to set the corresponding bit:
   chunk homozyVal = 1ul << chunkIdx;

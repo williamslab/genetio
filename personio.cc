@@ -23,11 +23,11 @@
 // <markerFile> is the filename for the file with metadata about the marker
 //    (a .snp, .map, or .bim file)
 // <indFile> is the filename for the per-individual information
-// <onlyChr> if non-zero is the value of the specific chromosome that should
+// <onlyChr> if non-NULL, is the name of the specific chromosome that should
 //           be analyzed
 // <startPos> is the starting position for an analysis of a partial chromosome
 // <endPos> is the ending position for an analysis of a partial chromosome
-// <analyzeChrX> if non-zero, indicates X chromosome will be analyzed
+// <XchrName> if non-NULL, gaves the name of the X chromosome
 // <noFamilyId> if non-zero, when reading PLINK format data, do not print
 //            the family ids in the output file
 // <printTrioKids> if non-zero, should print the haplotypes for trio
@@ -276,11 +276,11 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 
 // Method to read data stored in a VCF file.
 // <vcfFile> is the filename for the VCF file
-// <onlyChr> if non-zero is the value of the specific chromosome that should
+// <onlyChr> if non-NULL, is the name of the specific chromosome that should
 //           be analyzed
 // <startPos> is the starting position for an analysis of a partial chromosome
 // <endPos> is the ending position for an analysis of a partial chromosome
-// <analyzeChrX> if non-zero, indicates X chromosome will be analyzed
+// <XchrName> if non-NULL, gaves the name of the X chromosome
 template <class P>
 void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
 			  int startPos, int endPos, const char *XchrName,
@@ -386,9 +386,14 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
     }
     exit(1);
   }
- 
-  // Will ignore starting positions if the chromosome to read from isn't defined
-  if (startPos && !onlyChr) {
+
+  if (onlyChr == NULL && numContigs == 1) {
+    // have only one chromosome: set onlyChr accordingly so that we also use
+    // startPos
+    onlyChr = Marker::getMarker(0)->getChromName();
+  }
+  else if (onlyChr == NULL && startPos) {
+    // Ignore starting positions if the chromosome to read from isn't defined
     for (int o = 0; o < 2; o++) {
       FILE *out = outs[o];
       if (out == NULL)
@@ -432,15 +437,44 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
   // <header->samples> stores the identifiers for the samples, <header->n[2]>
   // stores the number of samples.
   PersonIO<PersonBits>::makePersonsFromIds(header->samples, header->n[2]);
-  // TODO: destroy the header? (Or save for printing results?
 
-  fprintf(stderr, "ERROR: code to parse VCF files not yet complete\n");
-  exit(0);
+  // no longer need header:
+  bcf_hdr_destroy(header);
 
-//  // TODO (1): now read data! want to skip sites that aren't on the chromosome
-//  // being examined and aren't between start/end
-//
-//  exit(0);
+  // restart reading with the iterator as above:
+  itr = tbx_itr_queryi(index, chr_tid, startPos, endPos);
+  if (itr == 0) {
+    for (int o = 0; o < 2; o++) {
+      FILE *out = outs[o];
+      if (out == NULL)
+	continue;
+      if (onlyChr)
+	fprintf(out, "ERROR: Could not locate position %s:%d-%d\n", onlyChr,
+		startPos, endPos);
+      fprintf(out, "ERROR: Could not initialize a Tabix iterator\n");
+    }
+    exit(2);
+  }
+
+  // read the genotypes:
+  parseVCFGenotypes(vcfIn, index, itr, vcfFile, outs);
+
+  // done iterating
+  tbx_itr_destroy(itr);
+
+  // done completely; close files:
+  tbx_destroy(index);
+//  hts_close(vcfIn); <-- commented out since it is redundant with next line:
+  int ret = hclose(hfile);
+  if (ret != 0) {
+    for (int o = 0; o < 2; o++) {
+      FILE *out = outs[o];
+      if (out == NULL)
+	continue;
+      fprintf(out, "ERROR: Closing %s produced an error, continuing ...\n",
+	      vcfFile);
+    }
+  }
 }
 
 // Reads the individual file <filename> and stores the resulting individual
@@ -598,7 +632,7 @@ void PersonIO<P>::parsePedGenotypes(FILE *in, P *thePerson) {
   int curMarkerIdx = 0;
   // What marker index on the chromosome does the next genotype correspond to?
   int chromMarkerIdx = 0;
-  // Which chromosome are we currently on?
+  // Which chromosome index are we currently on?
   int chromIdx = Marker::getMarker(0)->getChromIdx();
 
   // Note: because SNPs are listed by individual, rather than all data for a
@@ -643,8 +677,7 @@ void PersonIO<P>::parsePedGenotypes(FILE *in, P *thePerson) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
-      // Now on next chromosome; update chunk indices and check whether we
-      // have a long enough homozygous region to call IBD:
+      // Now on next chromosome; update chunk indices
       if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
 	curHapChunk++; // markers for current chrom are on next chunk number
 	curChunkIdx = 0;
@@ -703,7 +736,6 @@ void PersonIO<P>::parsePedGenotypes(FILE *in, P *thePerson) {
 
   // Should have gotten through all markers:
   assert( curMarkerIdx == Marker::getNumMarkers() );
-
 }
 
 // Rereads the PLINK format .fam file to identify and set parents as
@@ -921,7 +953,7 @@ void PersonIO<P>::parsePackedGenotypes(FILE *in, int recordLen, char *buf,
   int curMarkerIdx = 0;
   // What marker index on the chromosome does the next genotype correspond to?
   int chromMarkerIdx = 0;
-  // Which chromosome are we currently on?
+  // Which chromosome index are we currently on?
   int chromIdx = Marker::getMarker(0)->getChromIdx();
 
   // For computing allele frequencies for the current marker:
@@ -1078,11 +1110,8 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in) {
   int curMarkerIdx = 0;
   // What marker index on the chromosome does the next genotype correspond to?
   int chromMarkerIdx = 0;
-  // Which chromosome are we currently on?
+  // Which chromosome index are we currently on?
   int chromIdx = Marker::getMarker(0)->getChromIdx();
-  // which MetaPerson (individual) are we on?  This corresponds to the column
-  // number on the current line.
-  int curPersonIdx = 0;
 
   // For computing allele frequencies for the current marker:
   int alleleCount;    // init'd below
@@ -1119,8 +1148,7 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
-      // Now on next chromosome; update chunk indices and check whether we
-      // have a long enough homozygous region to call IBD:
+      // Now on next chromosome; update chunk indices
       if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
 	curHapChunk++; // markers for current chrom are on next chunk number
 	curChunkIdx = 0;
@@ -1131,7 +1159,7 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in) {
       chromIdx = Marker::getMarker(curMarkerIdx)->getChromIdx();
     }
 
-    for(curPersonIdx = 0; curPersonIdx < numSamples; curPersonIdx++) {
+    for(int curPersonIdx = 0; curPersonIdx < numSamples; curPersonIdx++) {
       c = buf[curPersonIdx];
 
       // the genotype
@@ -1212,6 +1240,229 @@ void PersonIO<P>::parsePlinkBedFormat(FILE *in) {
   delete [] buf;
 }
 
+// Parses genotypes only (not marker information, which is done in the Marker
+// class) from a VCF format input stream in <vcfIn>
+template <class P>
+void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
+				    hts_itr_t *itr, const char *vcfFile,
+				    FILE *outs[2]) {
+  int numIndivs = P::_allIndivs.length();
+
+  // Which haplotype chunk are we on?  (A chunk is BITS_PER_CHUNK bits)
+  int curHapChunk = 0;
+  // Which bit/locus within the chunk are we on?
+  int curChunkIdx = 0;
+
+  // Which marker number does the data correspond to?
+  int curMarkerIdx = 0;
+  // What marker index on the chromosome does the next genotype correspond to?
+  int chromMarkerIdx = 0;
+  // Which chromosome index are we currently on?
+  int chromIdx = Marker::getMarker(0)->getChromIdx();
+
+  // For computing allele frequencies for the current marker:
+  int alleleCount;    // init'd below
+  int totalGenotypes;
+
+  int numMarkersToRead = Marker::getNumMarkers();
+
+  // TODO: should we delete this dynarray in Marker?
+  const dynarray<int> &omitMarkers = Marker::getMarkersToOmit();
+  int omitIdx = 0;
+  int nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
+
+  // Start parsing the VCF using HTSlib; gives one line at a time:
+  // Go through all the lines in the query region
+  for ( ; tbx_itr_next(vcfIn, index, itr, &vcfIn->line) >= 0; curMarkerIdx++) {
+    assert(curMarkerIdx < numMarkersToRead);
+    // string for the current line is in vcfIn->line.s
+
+    if (curMarkerIdx == nextToOmitIdx) {
+      // skip this marker
+      omitIdx++;
+      nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
+      // must decrement curMarkerIdx since this index *is* used in the markers
+      // that are stored
+      curMarkerIdx--;
+      continue;
+    }
+
+    alleleCount = 0;
+    totalGenotypes = 0;
+
+    if (Marker::getLastMarkerNumX(chromIdx) == curMarkerIdx - 1) {
+      // shouldn't be last chrom
+      assert(chromIdx < Marker::getNumChroms() - 1);
+
+      // Now on next chromosome; update chunk indices
+      if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
+	curHapChunk++; // markers for current chrom are on next chunk number
+	curChunkIdx = 0;
+      }
+
+      chromMarkerIdx = 0; // back to first marker on the new chromosome
+
+      chromIdx = Marker::getMarker(curMarkerIdx)->getChromIdx();
+    }
+
+    // ignore tokens 0..7 -- want the FORMAT value (token index 8)
+    unsigned int c = 0; // current index into vcfIn->line.s
+    for(int token = 0; token <= 7; token++) {
+      for( ; vcfIn->line.s[c] != '\t'; c++); // skip until next delimiter: '\t'
+      // vcfIn->line.s[c] == '\t' -- go to next c for next token
+      c++;
+    }
+
+    // according to the spec, the GT data type, if present, must be the first
+    // field; double check this:
+    if (!(vcfIn->line.s[c] == 'G' && vcfIn->line.s[c+1] == 'T' &&
+	  (vcfIn->line.s[c+2] == ':' || vcfIn->line.s[c+2] == '\t'))) {
+      for (int o = 0; o < 2; o++) {
+	FILE *out = outs[o];
+	if (out == NULL)
+	  continue;
+	fprintf(out, "ERROR: GT data type expected as first format in %s\n",
+		vcfFile);
+      }
+      exit(2);
+    }
+    c+=2; // skip past "GT"
+
+    // read past the FORMAT string:
+    for( ; vcfIn->line.s[c] != '\t'; c++);
+    c++; // now skip past the '\t' to the first genotype
+
+    // now read in genotypes for each sample:
+    for(int curPersonIdx = 0; curPersonIdx < numIndivs; curPersonIdx++) {
+      int geno[2];
+
+      // first genotype
+      char tmp = vcfIn->line.s[c];
+      c++;
+      if (tmp == '.') {
+	geno[0] = -1; // missing data
+      }
+      else {
+	if (!isdigit(tmp)) {
+	  for (int o = 0; o < 2; o++) {
+	    FILE *out = outs[o];
+	    if (out == NULL)
+	      continue;
+	    fprintf(out, "ERROR: first genotype value non-numeric?\n");
+	  }
+	  exit(2);
+	}
+	geno[0] = tmp - '0'; // as integer
+      }
+
+      // check the character between two genotypes
+      char delim = vcfIn->line.s[c];
+      c++;
+      if (delim != '/' && delim != '|' && delim != ':' && delim != '\t') {
+	for (int o = 0; o < 2; o++) {
+	  FILE *out = outs[o];
+	  if (out == NULL)
+	    continue;
+	  fprintf(out, "ERROR: expecting genotype of the form x/x or x|x\n");
+	}
+	exit(2);
+      }
+
+      if (delim == ':' || delim == '\t') {
+	// only one genotype: is either X chromosome in males, Y, or MT
+	// will set to homozygous:
+	geno[1] = geno[0];
+      }
+      else {
+	tmp = vcfIn->line.s[c];
+	c++;
+	if (tmp == '.') {
+	  geno[1] = -1; // missing data
+	  if (geno[0] != -1) {
+	    // TODO: make function for this
+	    for (int o = 0; o < 2; o++) {
+	      FILE *out = outs[o];
+	      if (out == NULL)
+		continue;
+	      fprintf(out, "ERROR: second genotype missing but first not?\n");
+	    }
+	    exit(2);
+	  }
+	}
+	else {
+	  if (!isdigit(tmp)) {
+	    for (int o = 0; o < 2; o++) {
+	      FILE *out = outs[o];
+	      if (out == NULL)
+		continue;
+	      fprintf(out, "ERROR: first genotype value non-numeric?\n");
+	    }
+	    exit(2);
+	  }
+	  geno[1] = tmp - '0'; // as integer
+	}
+
+	delim = (c < vcfIn->line.l) ? vcfIn->line.s[c] : '\t';
+	//c++; <-- commented out so we don't skip past '\t' expected below
+	if (delim != ':' && delim != '\t') {
+	  for (int o = 0; o < 2; o++) {
+	    FILE *out = outs[o];
+	    if (out == NULL)
+	      continue;
+	    fprintf(out, "ERROR: expecting genotype of the form x/x or x|x\n");
+	    fprintf(out,"       genotype with more than two alleles present\n");
+	  }
+	  exit(2);
+	}
+      }
+
+      P::_allIndivs[curPersonIdx]->setGenotypeX(curHapChunk, curChunkIdx,
+					       chromIdx, chromMarkerIdx, geno);
+
+      if (geno[0] >= 0) {
+	alleleCount += geno[0] + geno[1];
+	totalGenotypes++;
+      }
+
+      // read to the end of this entry for <curPersonIdx>:
+      // note: line->l stores length
+      for( ; c < vcfIn->line.l && vcfIn->line.s[c] != '\t'; c++);
+      c++; // skip past the '\t'
+      if (c >= vcfIn->line.l && curPersonIdx+1 < numIndivs) {
+	for (int o = 0; o < 2; o++) {
+	  FILE *out = outs[o];
+	  if (out == NULL)
+	    continue;
+	  fprintf(out, "ERROR: read genotypes for %d samples of %d expected\n",
+		  curPersonIdx+1, numIndivs);
+	}
+	exit(2);
+      }
+    }
+
+    if (c+1 < vcfIn->line.l) {
+      for (int o = 0; o < 2; o++) {
+	FILE *out = outs[o];
+	if (out == NULL)
+	  continue;
+	fprintf(out, "ERROR: more data than the %d expected samples\n",
+		numIndivs);
+      }
+      exit(2);
+    }
+
+    Marker::getMarkerNonConst(curMarkerIdx)->setAlleleFreq(alleleCount,
+							   totalGenotypes);
+    // increment marker num:
+    curChunkIdx++;
+    chromMarkerIdx++;
+    if (curChunkIdx == BITS_PER_CHUNK) {
+      curHapChunk++;
+      curChunkIdx = 0;
+    }
+  }
+}
+
 // Prints an eigenstrat-format .geno file to <out>
 template <class P>
 void PersonIO<P>::printEigenstratGeno(FILE *out) {
@@ -1234,8 +1485,7 @@ void PersonIO<P>::printEigenstratGeno(FILE *out) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
-      // Now on next chromosome; update chunk indices and check whether we
-      // have a long enough homozygous region to call IBD:
+      // Now on next chromosome; update chunk indices
       if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
 	curHapChunk++; // markers for current chrom are on next chunk number
 	curChunkIdx = 0;
@@ -1292,8 +1542,7 @@ void PersonIO<P>::printEigenstratPhased(FILE *out, int numSamples) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
-      // Now on next chromosome; update chunk indices and check whether we
-      // have a long enough homozygous region to call IBD:
+      // Now on next chromosome; update chunk indices
       if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
 	curHapChunk++; // markers for current chrom are on next chunk number
 	curChunkIdx = 0;
@@ -1329,7 +1578,7 @@ void PersonIO<P>::printGzEigenstratPhased(gzFile out) {
 
   // What marker index on the chromosome does the next genotype correspond to?
   int chromMarkerIdx = 0;
-  // Which chromosome are we currently on?
+  // Which chromosome index are we currently on?
   int chromIdx = Marker::getMarker(0)->getChromIdx();
 
   // curHapChunk: which haplotype chunk are we on? (BITS_PER_CHUNK bit chunks)
@@ -1345,8 +1594,7 @@ void PersonIO<P>::printGzEigenstratPhased(gzFile out) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
-      // Now on next chromosome; update chunk indices and check whether we
-      // have a long enough homozygous region to call IBD:
+      // Now on next chromosome; update chunk indices
       if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
 	curHapChunk++; // markers for current chrom are on next chunk number
 	curChunkIdx = 0;
@@ -1425,8 +1673,7 @@ void PersonIO<P>::printImpute2Haps(FILE *out) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
-      // Now on next chromosome; update chunk indices and check whether we
-      // have a long enough homozygous region to call IBD:
+      // Now on next chromosome; update chunk indices
       if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
 	curHapChunk++; // markers for current chrom are on next chunk number
 	curChunkIdx = 0;
@@ -1482,8 +1729,7 @@ void PersonIO<P>::printGzImpute2Haps(gzFile out) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
-      // Now on next chromosome; update chunk indices and check whether we
-      // have a long enough homozygous region to call IBD:
+      // Now on next chromosome; update chunk indices
       if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
 	curHapChunk++; // markers for current chrom are on next chunk number
 	curChunkIdx = 0;
@@ -1543,7 +1789,7 @@ void PersonIO<P>::printImpute2SampleFile(FILE *out, bool trioDuoOnly) {
   }
 }
 
-// explicitly instantiate PersionIO with Person class so we don't get linker
-// errors
+// explicitly instantiate PersionIO with the Person classes so we don't get
+// linker errors
 template class PersonIO<PersonBits>;
 template class PersonIO<PersonNorm>;
