@@ -81,16 +81,15 @@ void Marker::readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 
   // Start parsing the VCF using HTSlib; gives one line at a time:
   // Go through all the lines in the query region
-  kstring_t line = { 0, 0, 0 };
-  while (tbx_itr_next(vcfIn, index, itr, &line) >= 0) {
-    // string for the current line is in line.s
+  while (tbx_itr_next(vcfIn, index, itr, &vcfIn->line) >= 0) {
+    // string for the current line is in vcfIn->line.s
     // parse the parts of the string having to do with the marker:
 
     // read chromosome/contig name:
     int c;
     tmpStr.clear();
-    for(c = 0; line.s[c] != '\t'; c++) // to end of the field
-      tmpStr += line.s[c];
+    for(c = 0; vcfIn->line.s[c] != '\t'; c++) // to end of the field
+      tmpStr += vcfIn->line.s[c];
 
     // Note: because we're using the HTS iterator and have given it a region to
     // iterate over (in PersonIO::readVCF()), we don't need to check whether the
@@ -121,8 +120,8 @@ void Marker::readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
     // read physical position:
     int s = c + 1; // shift to the start of this field
     tmpStr.clear();
-    for(c = 0; line.s[s+c] != '\t'; c++) // to end of the field
-      tmpStr += line.s[s+c];
+    for(c = 0; vcfIn->line.s[s+c] != '\t'; c++) // to end of the field
+      tmpStr += vcfIn->line.s[s+c];
     s += c + 1; // update shift value to the start of the next field
     physPos = atoi(tmpStr.c_str());
 
@@ -132,27 +131,29 @@ void Marker::readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 
     // read marker name:
     markerName.clear();
-    for(c = 0; line.s[s+c] != '\t'; c++) // to end of the field
-      markerName += line.s[s+c];
+    for(c = 0; vcfIn->line.s[s+c] != '\t'; c++) // to end of the field
+      markerName += vcfIn->line.s[s+c];
     s += c + 1; // update shift
 
     // read reference allele:
     alleles.clear();
-    for(c = 0; line.s[s+c] != '\t'; c++)
-      alleles += line.s[s+c];
+    for(c = 0; vcfIn->line.s[s+c] != '\t'; c++)
+      alleles += vcfIn->line.s[s+c];
     alleles += ' ';
     s += c + 1; // update shift
 
     // read alternate alleles:
     int numAlleles = 1;
-    for(c = 0; line.s[s+c] != '\t'; c++) {
-      if (line.s[s+c] == ',')
+    for(c = 0; vcfIn->line.s[s+c] != '\t'; c++) {
+      if (vcfIn->line.s[s+c] == ',')
 	alleles += ' ';
       else
-	alleles += line.s[s+c];
+	alleles += vcfIn->line.s[s+c];
       numAlleles++;
     }
     s += c + 1;
+
+    // TODO: check if the Person type P can handle this number of alleles
 
     ///////////////////////////////////////////////////////////////////////////
     // Have data read, now make the Marker and do bookkeeping as needed
@@ -198,8 +199,6 @@ void Marker::readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
     numMarkersCurChrom++;
     prevMarker = m;
   }
-  // done reading from the VCF, clean up
-  free(line.s);
 
   // Set starting chunk for final chromosome:
   if (prevMarker != NULL) {
