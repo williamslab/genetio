@@ -45,24 +45,23 @@ class Marker {
     static int getNumMarkers() { return _allMarkers.length(); }
     static int getNumMarkersInFile() { return _numMarkersInFile; }
     static int getFirstStoredMarkerFileIdx() { return _firstStoredMarkerIdx; }
-    // TODO: remove Xs
-    static int getFirstMarkerNumX(int chromIdx)
-					  { return _firstMarkerNumX[chromIdx]; }
-    static int getLastMarkerNumX(int chromIdx)
-					  { return _lastMarkerNumX[chromIdx]; }
+    static int getFirstMarkerNum(int chromIdx)
+					  { return _firstMarkerNum[chromIdx]; }
+    static int getLastMarkerNum(int chromIdx)
+					  { return _lastMarkerNum[chromIdx]; }
 //    static const Marker * getFirstMarker(int chrom)
 //			    { return getMarker( getFirstMarkerNum(chrom) ); }
-    static int getNumChromMarkersX(int chromIdx)
-	    { return _lastMarkerNumX[chromIdx] - _firstMarkerNumX[chromIdx] + 1; }
+    static int getNumChromMarkers(int chromIdx)
+	    { return _lastMarkerNum[chromIdx] - _firstMarkerNum[chromIdx] + 1; }
 
     static int getNumHapChunks() { return _numHapChunks; }
-    static int getFirstHapChunkX(int chromIdx) {return _firstHapChunkX[chromIdx];}
-    static int getLastHapChunkX(int chromIdx)  {return _lastHapChunkX[chromIdx];}
+    static int getFirstHapChunk(int chromIdx) {return _firstHapChunk[chromIdx];}
+    static int getLastHapChunk(int chromIdx)  {return _lastHapChunk[chromIdx];}
     static int getNumHapChunksFor(int numMarkers);
     // Returns the number of markers not divisible by the num of bits in a chunk
     static int getChunkModMarkers(int numMarkers);
 
-    static int getFirstMarkerNumForChunkX(int chromIdx, int chunkNum);
+    static int getFirstMarkerNumForChunk(int chromIdx, int chunkNum);
 
     static const Marker * getMarker(int num) { return _allMarkers[num]; }
 
@@ -90,7 +89,7 @@ class Marker {
     const char * getChromName() const { return _chromNames[ _chromIdx ]; }
     float getMapPos() const       { return _mapPos; }
     int   getPhysPos() const      { return _physPos; }
-    const char * getAlleleStr() const  { return _allelesX; }
+    const char * getAlleleStr() const  { return _alleles; }
     short getNumAlleles() const   { return _numAlleles; }
     // Note: these values do not get initialized for .ped files for which SNPs
     // are read in an awkward order for this calculation to be done while
@@ -126,8 +125,7 @@ class Marker {
     float _mapPos;
 
     // Alleles; stored as a single string with a space separating the types.
-    // TODO: take off all the X's
-    char *_allelesX;
+    char *_alleles;
     uint8_t _numAlleles;
 
     // chromosome
@@ -176,19 +174,19 @@ class Marker {
 
     // Stores the first marker number on the corresponding chromosome number
     // 1..23, 0 if no markers on chrom
-    static dynarray<int> _firstMarkerNumX;
+    static dynarray<int> _firstMarkerNum;
 
     // Stores the last marker number on the corresponding chromosome number
     // 1..23, 0 if no markers on chrom
-    static dynarray<int> _lastMarkerNumX;
+    static dynarray<int> _lastMarkerNum;
 
     // Stores the starting haplotype chunk number for each chromosome, 0 if
     // no markers on chrom
-    static dynarray<int> _firstHapChunkX;
+    static dynarray<int> _firstHapChunk;
 
     // Stores the last haplotype chunk number for each chromosome, 0 if no
     // markers on chrom
-    static dynarray<int> _lastHapChunkX;
+    static dynarray<int> _lastHapChunk;
 
     // Number of haplotype chunks to store the data.  We store the haplotypes as
     // ulint type variables, with one locus per bit, so this number is the

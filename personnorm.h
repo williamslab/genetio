@@ -35,16 +35,16 @@ class PersonNorm : public SuperPerson {
     PersonNorm(char *id, char sex, int popIndex, short familyIdLength = 0);
     ~PersonNorm();
 
-    int getGenotypeX(int chunkNum, int chunkIdx, int chromIdx,
-		     int chromMarkerIdx) {
-      int markerNum = Marker::getFirstMarkerNumX(chromIdx) + chromMarkerIdx;
+    int getGenotype(int chunkNum, int chunkIdx, int chromIdx,
+		    int chromMarkerIdx) {
+      int markerNum = Marker::getFirstMarkerNum(chromIdx) + chromMarkerIdx;
       assert(Marker::getMarker(markerNum)->getNumAlleles() <= 2);
-      return _genoX[chromIdx][chromMarkerIdx][0] +
-					    _genoX[chromIdx][chromMarkerIdx][1];
+      return _geno[chromIdx][chromMarkerIdx][0] +
+					    _geno[chromIdx][chromMarkerIdx][1];
     }
-    int getHapAlleleX(int homolog, int chunkNum, int chunkIdx, int chromIdx,
+    int getHapAllele(int homolog, int chunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx) {
-      return _genoX[chromIdx][chromMarkerIdx][homolog];
+      return _geno[chromIdx][chromMarkerIdx][homolog];
     }
 
     // Note: these next two methods are currently only used by PersonIO:
@@ -67,7 +67,7 @@ class PersonNorm : public SuperPerson {
     // private methods
     //////////////////////////////////////////////////////////////////
 
-    void setGenotypeX(int hapChunkNum, int chunkIdx, int chromIdx,
+    void setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx, int geno[2]);
     void setParents(char *familyid, PersonNorm *parents[2],
 		    int numParents, bool &warningPrinted, FILE *log,
@@ -85,8 +85,7 @@ class PersonNorm : public SuperPerson {
     // Stores genotypes for <this>.  Genotypes are indexed first by chromosome
     // then by marker number.  Markers are ordered by physical position on each
     // chromosome.
-    // TODO: remove X
-    Genotype **_genoX;
+    Genotype **_geno;
 
     // Pointers to parents of <this>. _parents[0] is the father,
     // _parents[1] is the mother

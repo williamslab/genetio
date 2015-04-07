@@ -31,9 +31,9 @@ class SuperPerson {
     const char *getPopLabel() { return _popLabels[_popIndex];}
     char getSex() { return _sex; }
     int getPopIndex() { return _popIndex; }
-    virtual int getGenotypeX(int chunkNum, int chunkIdx, int chromIdx,
+    virtual int getGenotype(int chunkNum, int chunkIdx, int chromIdx,
 			    int chromMarkerIdx) = 0;
-    virtual int getHapAlleleX(int homolog, int chunkNum, int chunkIdx,
+    virtual int getHapAllele(int homolog, int chunkNum, int chunkIdx,
 			     int chromIdx, int chromMarkerIdx) = 0;
 
     bool isIgnore() { return _ignore; }
@@ -54,7 +54,7 @@ class SuperPerson {
     // protected methods
     //////////////////////////////////////////////////////////////////
 
-    virtual void setGenotypeX(int hapChunkNum, int chunkIdx, int chromIdx,
+    virtual void setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
 			     int chromMarkerIdx, int geno[2]) = 0;
     virtual void setXHetToMissing(int *numHets = NULL,
 				  int *numCalls = NULL) = 0;

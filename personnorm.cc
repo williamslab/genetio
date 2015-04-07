@@ -20,11 +20,11 @@ PersonNorm::PersonNorm(char *id, char sex,int popIndex,
 		     SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
     int numChroms = Marker::getNumChroms();
-    _genoX = new Genotype *[numChroms];
+    _geno = new Genotype *[numChroms];
     for(int c = 0; c < numChroms; c++) {
-      int numChrMarkers = Marker::getNumChromMarkersX(c);
+      int numChrMarkers = Marker::getNumChromMarkers(c);
       assert(numChrMarkers > 0);
-      _genoX[c] = new Genotype[numChrMarkers];
+      _geno[c] = new Genotype[numChrMarkers];
     }
 
     _parents[0] = _parents[1] = NULL;
@@ -42,18 +42,18 @@ PersonNorm::~PersonNorm() {
   if (!_ignore) {
     int numChroms = Marker::getNumChroms();
     for(int c = 0; c < numChroms; c++) {
-      delete [] _genoX[c];
+      delete [] _geno[c];
     }
   }
 }
 
-void PersonNorm::setGenotypeX(int hapChunkNum, int chunkIdx, int chromIdx,
+void PersonNorm::setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
 			     int chromMarkerIdx, int geno[2]) {
   if (_ignore)
     return; // no need/nowhere to store genotypes
 
   for(int h = 0; h < 2; h++)
-    _genoX[chromIdx][chromMarkerIdx][h] = geno[h];
+    _geno[chromIdx][chromMarkerIdx][h] = geno[h];
 }
 
 // Given the parents of <this>, sets pointers to those parents in

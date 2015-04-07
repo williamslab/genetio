@@ -203,7 +203,7 @@ void PersonBits::inferTrioDuoHaplotypes(PersonBits *child,
   // curChunkIdx: which bit/locus within the chunk are we on?
   uint32_t curHapChunk = 0, curChunkIdx = 0;
   for(int m = 0; m < numMarkers; m++, curChunkIdx++) {
-    if (Marker::getLastMarkerNumX(chromIdx) == m - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == m - 1) {
       chromIdx = Marker::getMarker(m)->getChromIdx();
 
       if (curChunkIdx < BITS_PER_CHUNK) {
@@ -454,7 +454,7 @@ void PersonBits::printTrioEigenstratPhased(FILE *out) {
   // curChunkIdx: which bit/locus within the chunk are we on?
   for(int m = 0, curHapChunk = 0, curChunkIdx = 0; m < numMarkers;
 							  m++, curChunkIdx++) {
-    if (Marker::getLastMarkerNumX(chromIdx) == m - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == m - 1) {
       // Now on next chromosome; update chunk indices
       if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
 	curHapChunk++; // markers for current chrom are on next chunk number
@@ -621,7 +621,7 @@ void PersonBits::initRandSampledHaps() {
   }
 }
 
-void PersonBits::setGenotypeX(int hapChunkNum, int chunkIdx, int chromIdx,
+void PersonBits::setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
 			     int chrMarkerIdx, int geno[2]) {
   if (_ignore)
     return; // no need/nowhere to store genotypes

@@ -673,7 +673,7 @@ void PersonIO<P>::parsePedGenotypes(FILE *in, P *thePerson) {
 //    alleleCount = 0;
 //    totalGenotypes = 0;
 
-    if (Marker::getLastMarkerNumX(chromIdx) == curMarkerIdx - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == curMarkerIdx - 1) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
@@ -983,7 +983,7 @@ void PersonIO<P>::parsePackedGenotypes(FILE *in, int recordLen, char *buf,
       continue;
     }
 
-    if (Marker::getLastMarkerNumX(chromIdx) == curMarkerIdx - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == curMarkerIdx - 1) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
@@ -1049,7 +1049,7 @@ void PersonIO<P>::parsePackedGenotypes(FILE *in, int recordLen, char *buf,
 	}
       }
 
-      P::_allIndivs[curPersonIdx]->setGenotypeX(curHapChunk, curChunkIdx,
+      P::_allIndivs[curPersonIdx]->setGenotype(curHapChunk, curChunkIdx,
 					       chromIdx, chromMarkerIdx, geno);
 
       if (geno[0] >= 0) {
@@ -1144,7 +1144,7 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in) {
     alleleCount = 0;
     totalGenotypes = 0;
 
-    if (Marker::getLastMarkerNumX(chromIdx) == curMarkerIdx - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == curMarkerIdx - 1) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
@@ -1185,7 +1185,7 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in) {
 	  break;
       }
 
-      P::_allIndivs[curPersonIdx]->setGenotypeX(curHapChunk, curChunkIdx,
+      P::_allIndivs[curPersonIdx]->setGenotype(curHapChunk, curChunkIdx,
 					       chromIdx, chromMarkerIdx, geno);
 
       if (geno[0] >= 0) {
@@ -1290,7 +1290,7 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
     alleleCount = 0;
     totalGenotypes = 0;
 
-    if (Marker::getLastMarkerNumX(chromIdx) == curMarkerIdx - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == curMarkerIdx - 1) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
@@ -1416,7 +1416,7 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
 	}
       }
 
-      P::_allIndivs[curPersonIdx]->setGenotypeX(curHapChunk, curChunkIdx,
+      P::_allIndivs[curPersonIdx]->setGenotype(curHapChunk, curChunkIdx,
 					       chromIdx, chromMarkerIdx, geno);
 
       if (geno[0] >= 0) {
@@ -1481,7 +1481,7 @@ void PersonIO<P>::printEigenstratGeno(FILE *out) {
 
   for(int m = 0; m < numMarkers; m++) {
 
-    if (Marker::getLastMarkerNumX(chromIdx) == m - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == m - 1) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
@@ -1497,7 +1497,7 @@ void PersonIO<P>::printEigenstratGeno(FILE *out) {
     }
 
     for(int i = 0; i < numIndivs; i++) {
-      int genotype = P::_allIndivs[i]->getGenotypeX(curHapChunk, curChunkIdx,
+      int genotype = P::_allIndivs[i]->getGenotype(curHapChunk, curChunkIdx,
 						   chromIdx, chromMarkerIdx);
       fprintf(out, "%d", genotype);
     }
@@ -1538,7 +1538,7 @@ void PersonIO<P>::printEigenstratPhased(FILE *out, int numSamples) {
       curChunkIdx = 0;
     }
 
-    if (Marker::getLastMarkerNumX(chromIdx) == m - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == m - 1) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
@@ -1559,7 +1559,7 @@ void PersonIO<P>::printEigenstratPhased(FILE *out, int numSamples) {
 	continue;
 
       for(int h = 0; h < 2; h++) {
-	int hapAllele = P::_allIndivs[i]->getHapAlleleX(h, curHapChunk,
+	int hapAllele = P::_allIndivs[i]->getHapAllele(h, curHapChunk,
 						       curChunkIdx, chromIdx,
 						       chromMarkerIdx);
 	fprintf(out, "%d", hapAllele);
@@ -1590,7 +1590,7 @@ void PersonIO<P>::printGzEigenstratPhased(gzFile out) {
       curChunkIdx = 0;
     }
 
-    if (Marker::getLastMarkerNumX(chromIdx) == m - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == m - 1) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
@@ -1611,7 +1611,7 @@ void PersonIO<P>::printGzEigenstratPhased(gzFile out) {
 	continue;
 
       for(int h = 0; h < 2; h++) {
-	int hapAllele = P::_allIndivs[i]->getHapAlleleX(h, curHapChunk,
+	int hapAllele = P::_allIndivs[i]->getHapAllele(h, curHapChunk,
 						       curChunkIdx, chromIdx,
 						       chromMarkerIdx);
 	gzprintf(out, "%d", hapAllele);
@@ -1669,7 +1669,7 @@ void PersonIO<P>::printImpute2Haps(FILE *out) {
       curChunkIdx = 0;
     }
 
-    if (Marker::getLastMarkerNumX(chromIdx) == m - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == m - 1) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
@@ -1694,7 +1694,7 @@ void PersonIO<P>::printImpute2Haps(FILE *out) {
 	continue;
 
       for(int h = 0; h < 2; h++) {
-	int hapAllele = P::_allIndivs[i]->getHapAlleleX(h, curHapChunk,
+	int hapAllele = P::_allIndivs[i]->getHapAllele(h, curHapChunk,
 						       curChunkIdx, chromIdx,
 						       chromMarkerIdx);
 	fprintf(out, " %d", hapAllele);
@@ -1725,7 +1725,7 @@ void PersonIO<P>::printGzImpute2Haps(gzFile out) {
       curChunkIdx = 0;
     }
 
-    if (Marker::getLastMarkerNumX(chromIdx) == m - 1) {
+    if (Marker::getLastMarkerNum(chromIdx) == m - 1) {
       // shouldn't be last chrom
       assert(chromIdx < Marker::getNumChroms() - 1);
 
@@ -1750,7 +1750,7 @@ void PersonIO<P>::printGzImpute2Haps(gzFile out) {
 	continue;
 
       for(int h = 0; h < 2; h++) {
-	int hapAllele = P::_allIndivs[i]->getHapAlleleX(h, curHapChunk,
+	int hapAllele = P::_allIndivs[i]->getHapAllele(h, curHapChunk,
 						       curChunkIdx, chromIdx,
 						       chromMarkerIdx);
 	gzprintf(out, " %d", hapAllele);

@@ -17,10 +17,10 @@ bool Marker::_readOnlyOneChrom = false;
 int Marker::_firstStoredMarkerIdx = -1; // by default -1 => not applicable
 int Marker::_numMarkersInFile = 0; // gets updated as we read the file
 dynarray<char *> Marker::_chromNames;
-dynarray<int> Marker::_firstMarkerNumX;
-dynarray<int> Marker::_lastMarkerNumX;
-dynarray<int> Marker::_firstHapChunkX;
-dynarray<int> Marker::_lastHapChunkX;
+dynarray<int> Marker::_firstMarkerNum;
+dynarray<int> Marker::_lastMarkerNum;
+dynarray<int> Marker::_firstHapChunk;
+dynarray<int> Marker::_lastHapChunk;
 int Marker::_numHapChunks = 0;
 dynarray<int>    Marker::_hapWindowEnds;
 dynarray<float> Marker::_hapWindowMapCenter;
@@ -111,10 +111,10 @@ void Marker::readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
       _chromNames.append(newChrom);
       chromIdx = _chromNames.length() - 1;
 
-      _firstMarkerNumX.append(0);
-      _lastMarkerNumX.append(-1);
-      _firstHapChunkX.append(0);
-      _lastHapChunkX.append(-1);
+      _firstMarkerNum.append(0);
+      _lastMarkerNum.append(-1);
+      _firstHapChunk.append(0);
+      _lastHapChunk.append(-1);
     }
 
     // read physical position:
@@ -191,7 +191,7 @@ void Marker::readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 
 	int curMarkerNum = _allMarkers.length();
 	// about to append the first marker for this chrom to this index:
-	_firstMarkerNumX[chromIdx] = curMarkerNum;
+	_firstMarkerNum[chromIdx] = curMarkerNum;
       }
     }
     
@@ -239,7 +239,7 @@ void Marker::printSNPFile(FILE *out) {
     fprintf(out, "%d", cur->_physPos);
 
     // print alleles
-    fprintf(out, " %s\n", cur->_allelesX);
+    fprintf(out, " %s\n", cur->_alleles);
   }
 }
 
@@ -255,7 +255,7 @@ void Marker::printImpute2Prefix(FILE *out, int markerNum) {
   // IMPUTE2 format uses the opposite numerical encoding to Eigenstrat and
   // packed Ancestrymap formats, so we flip the allele order here:
   fprintf(out, "%s %s %d %s", cur->getChromName(), cur->getName(),
-	  cur->getPhysPos(), cur->_allelesX);
+	  cur->getPhysPos(), cur->_alleles);
 }
 
 // Print, in gzipped format, the first 5 columns of an IMPUTE2 format .haps
@@ -270,7 +270,7 @@ void Marker::printGzImpute2Prefix(gzFile out, int markerNum) {
   // IMPUTE2 format uses the opposite numerical encoding to Eigenstrat and
   // packed Ancestrymap formats, so we flip the allele order here:
   gzprintf(out, "%s %s %d %s", cur->getChromName(), cur->getName(),
-	   cur->getPhysPos(), cur->_allelesX);
+	   cur->getPhysPos(), cur->_alleles);
 }
 
 // Read marker/genetic map definition file of the following formats:
@@ -411,10 +411,10 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       _chromNames.append(newChrom);
       chromIdx = _chromNames.length() - 1;
 
-      _firstMarkerNumX.append(0);
-      _lastMarkerNumX.append(-1);
-      _firstHapChunkX.append(0);
-      _lastHapChunkX.append(-1);
+      _firstMarkerNum.append(0);
+      _lastMarkerNum.append(-1);
+      _firstHapChunk.append(0);
+      _lastHapChunk.append(-1);
     }
 
     if (_allMarkers.length() == 0) {
@@ -490,7 +490,7 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 
 	int curMarkerNum = _allMarkers.length();
 	// about to append the first marker for this chrom to this index:
-	_firstMarkerNumX[chromIdx] = curMarkerNum;
+	_firstMarkerNum[chromIdx] = curMarkerNum;
       }
     }
 
@@ -625,14 +625,14 @@ void Marker::updateWindowsMap(int initOffset, float windowLengthMorgans,
 // Sets the last marker number for <prevChromIdx> along with the first and last
 // chunk numbers
 void Marker::updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom) {
-  _lastMarkerNumX[prevChromIdx] = _allMarkers.length() - 1;
+  _lastMarkerNum[prevChromIdx] = _allMarkers.length() - 1;
   // Note: _numHapChunks is presently 1 more than the final chunk index for the
   // chromosome before <prevChromIdx>, i.e., exactly the first index we need
   // here:
-  _firstHapChunkX[prevChromIdx] = _numHapChunks;
+  _firstHapChunk[prevChromIdx] = _numHapChunks;
   // Update the total number of haplotype chunks:
   _numHapChunks += getNumHapChunksFor(numMarkersPrevChrom);
-  _lastHapChunkX[prevChromIdx] = _numHapChunks - 1;
+  _lastHapChunk[prevChromIdx] = _numHapChunks - 1;
 }
 
 // Stores the number of markers within the 0.25cM window: corrects for marker
@@ -664,9 +664,9 @@ int Marker::getChunkModMarkers(int numMarkers) {
   return numMarkers % BITS_PER_CHUNK;
 }
 
-int Marker::getFirstMarkerNumForChunkX(int chromIdx, int chunkNum) {
-  int numChunksIntoChrom = chunkNum - getFirstHapChunkX(chromIdx);
-  return getFirstMarkerNumX(chromIdx) + (BITS_PER_CHUNK * numChunksIntoChrom);
+int Marker::getFirstMarkerNumForChunk(int chromIdx, int chunkNum) {
+  int numChunksIntoChrom = chunkNum - getFirstHapChunk(chromIdx);
+  return getFirstMarkerNum(chromIdx) + (BITS_PER_CHUNK * numChunksIntoChrom);
 }
 
 // Returns the total physical length of the markers that were input
@@ -721,8 +721,8 @@ Marker::Marker(const char *markerName, int chromIdx, float mapPos,
   _mapPos = mapPos;
 
   if (alleles != NULL) {
-    _allelesX = new char[ strlen(alleles) + 1 ]; // +1 for '\0'
-    strcpy(_allelesX, alleles);
+    _alleles = new char[ strlen(alleles) + 1 ]; // +1 for '\0'
+    strcpy(_alleles, alleles);
     _numAlleles = numAlleles;
   }
   else {
