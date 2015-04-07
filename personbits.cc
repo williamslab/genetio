@@ -427,6 +427,8 @@ void PersonBits::cleanUpPostParse(bool keepTrioKids) {
   int length = _allIndivs.length();
   for(int p = 0; p < length; p++) {
     PersonBits *cur = _allIndivs[p];
+    if (cur->_ignore)
+      continue;
     if (cur->getTrioDuoType() == TRIO_CHILD) {
       if (keepTrioKids)
 	// need not retain genotype data for trio child, even though we are
