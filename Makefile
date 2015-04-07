@@ -1,18 +1,20 @@
 CPPSRCS= marker.cc util.cc hapi-ur-util.cc personio.cc personbits.cc superperson.cc personnorm.cc
 CSRCS= 
 OBJS= $(patsubst %.cc,%.o,$(CPPSRCS)) $(patsubst %.c,%.o,$(CSRCS))
-LIB=  ../libgenetio.a
+LIB= ../libgenetio.a
 
 GPP = g++
 GCC = gcc
 AR  = ar
 DEFINES= 
-#CFLAGS = -std=c++11 -g -Wall $(DEFINES)
+#CFLAGS = -g -Wall $(DEFINES)
 # optimized; remove asserts
-#CFLAGS = -std=c++11 -O2 -Wall -DNDEBUG $(DEFINES)
-CFLAGS = -std=c++11 -O2 -Wall $(DEFINES)
+#CFLAGS = -O2 -Wall -DNDEBUG $(DEFINES)
+CFLAGS = -O2 -Wall $(DEFINES)
 # profiling:
-#CFLAGS = -std=c++11 -pg -O2 -Wall $(DEFINES)
+#CFLAGS = -pg -O2 -Wall $(DEFINES)
+
+CPPFLAGS = -std=c++11 $(CFLAGS)
 
 # dependency variables / commands
 DEPDIR = .deps
@@ -36,7 +38,7 @@ $(LIB): $(OBJS) $(HEADERS)
 
 .cc.o:
 	@mkdir -p $(DEPDIR)
-	$(GPP) -MMD $(CFLAGS) -o $@ -c $<
+	$(GPP) -MMD $(CPPFLAGS) -o $@ -c $<
 	@cp $*.d $(df).P; \
 	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
 	  -e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $(df).P; \
