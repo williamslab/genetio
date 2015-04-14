@@ -508,19 +508,37 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 
 // Reads a string from <in>, skipping any leading whitespace, and returning
 // the whitespace character after the token to the caller
+// TODO : change this to fread instead of fgetc
 char Marker::readToken(FILE *in, std::string &toStr) {
-  char c;
-  while ((c = fgetc(in)) && (c == ' ' || c == '\t')); // read leading whitespace
-
-  if (c == EOF)
-    return c;
+  char c = ' ';
+  char *c_test = new char[1];
+  while ((c == ' ' || c == '\t')){
+    fread(&c_test,1,1, in);
+    c = c_test[1];
+    if (c == EOF) return c;
+  } // read leading whitespace
 
   toStr.clear();
 
   // read past the whitespace, so add the last read character to the string
   toStr += c;
-  while (!isspace(c = fgetc(in)) && c != EOF) // keep reading until whitespace
+
+  // while (!isspace(c = fgetc(in)) && c != EOF) // keep reading until whitespace
+  //   toStr += c;
+
+  const int SIZE = 1024;
+  char *data = new char[SIZE*100]; //100 kB - Might need more
+  for (int i = 0; i < SIZE * 100; i++){
+    // we are reading each byte at a time
+    // Would we save time by going through larger chunks?
+    fread(&data[i], 1, 1, in);
+    if (isspace(c = data[i]) || data[i] == EOF){
+      c = data[i];
+      break;
+    } 
+    c = data[i];
     toStr += c;
+  }
 
   return c;
 }

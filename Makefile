@@ -1,7 +1,7 @@
 CPPSRCS= marker.cc util.cc hapi-ur-util.cc personio.cc personbits.cc superperson.cc personnorm.cc
 CSRCS= 
 OBJS= $(patsubst %.cc,%.o,$(CPPSRCS)) $(patsubst %.c,%.o,$(CSRCS))
-LIB= ../libgenetio.a
+LIB= libgenetio.a
 
 GPP = g++
 GCC = gcc
@@ -43,7 +43,6 @@ $(LIB): $(OBJS) $(HEADERS)
 	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
 	  -e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $(df).P; \
 	  rm -f $*.d
-
 
 # include the .P dependency files, but don't warn if they don't exist (the -)
 -include $(CPPSRCS:%.cc=$(DEPDIR)/%.P)
