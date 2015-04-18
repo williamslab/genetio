@@ -111,9 +111,10 @@ class Marker {
 
     static void readMarkers(FILE *in, const char *onlyChr, int type,
 			    int startPos, int endPos);
+    static int skipWhitespace(char *buf, int &bind, size_t nread,
+			      const int BUF_SIZE);
     static void updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom);
     static void setNumMarkersInWindow(int startMarkerNum, int numMarkers);
-    static char readToken(FILE *in, std::string &toStr);
 
     // marker name (usually SNP rs id)
     char *_name;

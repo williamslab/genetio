@@ -1,5 +1,5 @@
 // Library for I/O of genetic data
-// Author: Amy Williams <alw289  cornell edu>
+// Author: Amy Williams <alw289 @ cornell edu>
 //
 // This program is distributed under the terms of the GNU General Public License
 
@@ -273,12 +273,62 @@ void Marker::printGzImpute2Prefix(gzFile out, int markerNum) {
 	   cur->getPhysPos(), cur->_alleles);
 }
 
+// Helper function for setting appropriate null character points
+// TODO : naming of function
+int readDoubleBuffer(FILE *in, char *field, char *curBuf, char *nextBuf, int BUF_SIZE, int buf_ind, size_t nread){
+    int status = skipWhitespace(curBuf, buf_ind, nread, BUF_SIZE);
+    if (status < 0) return -1; // We have reached EOF
+    int mstart = bind;
+    field = &curBuf[mstart]
+    for ( ; !isspace(curBuf[buf_ind]) && bind < nread; bind++);
+      if (bind == nread) {
+        // reached end of curBuf and markerName is incomplete; copy into
+        // <nextBuf> and then read more into that buffer
+        int numCpy = nread - mstart;
+        strncpy(nextBuf, markerNameX, nread - mstart);
+        fread(&nextBuf[numCpy], sizeof(char), BUF_SIZE - numCpy, in);
+        field = &nextBuf[0];
+
+        char *tmpBuf = curBuf;
+        curBuf = nextBuf;
+        nextBuf = tmpBuf;
+        // now get the end of marker name
+        buf_ind = numCpy;
+        for ( ; !isspace(curBuf[buf_ind]) && bind < nread; bind++);
+      }
+
+      assert(buf_ind < nread); // TODO: print error message if this doesn't hold?
+
+      // null terminate markerName by inserting '\0' in curBuf:
+      curBuf[buf_ind] = '\0';  
+
+    // Return the current buffer index so that we can pick up where we left off
+    return buf_ind;
+}
+
+
+
+
+
+
+
+
+
+
 // Read marker/genetic map definition file of the following formats:
 // If type == 1, reads Reich lab format .snp file
 // If type == 2, reads PLINK format .map file
 // If type == 3, reads PLINK format .bim file
 void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 			 int endPos) {
+  const int BUF_SIZE = 2048;
+  char buf1[BUF_SIZE], buf2[BUF_SIZE];
+  char *curBuf, *nextBuf;
+  size_t nread; // number of chars read into <curBuf>
+  int bind = 0; // current buffer index in <curBuf> (during parsing below)
+  // TODO: rename, remove
+  char *markerNameX;
+  char *chromNameX;
   std::string markerName;
   std::string chromName;
   std::string tmpStr;
@@ -293,14 +343,67 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
   // set genetic positions from physical?  Yes if all genetic positions are 0
   int setGenetFromPhys = -1;
 
+  curBuf = buf1;
+  nextBuf = buf2;
+  nread = fread(curBuf, sizeof(char), BUF_SIZE, in);
+
   while (1) {
     // Note: I assume the map positions are in Morgans per the spec of both
     // the Reich lab SNP file format and the spec of the PLINK .map file format
     if (type == 1) {
-      char c;
-      c = readToken(in, markerName); // read marker name
-      if (c == EOF) // done reading file
-	break;
+
+      // get the marker; first skip leading whitespace
+      int status = skipWhitespace(curBuf, bind, nread, BUF_SIZE);
+      if (status < 0) break; // reached EOF
+      // TODO! deal with status == 0 in skipWhitespace()
+      int mstart = bind;
+      markerNameX = &curBuf[mstart]; // found start of marker name
+      for ( ; !isspace(curBuf[bind]) && bind < nread; bind++);//find end of name
+      if (bind == nread) {
+      	// reached end of curBuf and markerName is incomplete; copy into
+      	// <nextBuf> and then read more into that buffer
+      	int numCpy = nread - mstart;
+      	strncpy(nextBuf, markerNameX, nread - mstart);
+      	fread(&nextBuf[numCpy], sizeof(char), BUF_SIZE - numCpy, in);
+      	markerNameX = &nextBuf[0];
+
+      	char *tmpBuf = curBuf;
+      	curBuf = nextBuf;
+      	nextBuf = tmpBuf;
+      	// now get the end of marker name
+      	bind = numCpy;
+      	for ( ; !isspace(curBuf[bind]) && bind < nread; bind++);
+      }
+
+      assert(bind < nread); // TODO: print error message if this doesn't hold?
+
+      // We are essentially repeating the whole thing again here
+
+      // null terminate markerName by inserting '\0' in curBuf:
+      curBuf[bind] = '\0';      
+
+      // get the chromosome name; first skip leading whitespace
+      status = skipWhitespace(curBuf, bind , BUF_SIZE)
+      if (status < 0) break; // reached EOF
+      int cstart = bind;
+      chromNameX = &curBuf[cstart];
+      for( ; !isspace(curBuf[bind]) && bind < nread; bind++){
+
+
+      }
+
+
+
+
+
+
+      // // Setting the marker name
+      // markerName = str(curBuf);
+
+
+      // readToken(in, markerName); // read marker name
+      if (fgetc(in) == EOF) break; // done reading file 
+
       readToken(in, chromName);  // read chromosome name
       readToken(in, tmpStr);     // read map position, then convert to float
       mapPos = atof(tmpStr.c_str());
@@ -506,41 +609,22 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
   }
 }
 
-// Reads a string from <in>, skipping any leading whitespace, and returning
-// the whitespace character after the token to the caller
-// TODO : change this to fread instead of fgetc
-char Marker::readToken(FILE *in, std::string &toStr) {
-  char c = ' ';
-  char *c_test = new char[1];
-  while ((c == ' ' || c == '\t')){
-    fread(&c_test,1,1, in);
-    c = c_test[1];
-    if (c == EOF) return c;
-  } // read leading whitespace
-
-  toStr.clear();
-
-  // read past the whitespace, so add the last read character to the string
-  toStr += c;
-
-  // while (!isspace(c = fgetc(in)) && c != EOF) // keep reading until whitespace
-  //   toStr += c;
-
-  const int SIZE = 1024;
-  char *data = new char[SIZE*100]; //100 kB - Might need more
-  for (int i = 0; i < SIZE * 100; i++){
-    // we are reading each byte at a time
-    // Would we save time by going through larger chunks?
-    fread(&data[i], 1, 1, in);
-    if (isspace(c = data[i]) || data[i] == EOF){
-      c = data[i];
-      break;
-    } 
-    c = data[i];
-    toStr += c;
+// TODO: comment, including on return value
+bool skipWhitespace(char *buf, int &bind, size_t nread, const int BUF_SIZE) {
+  for ( ; (curBuf[bind] == ' ' ||curBuf[bind] == '\t') && bind < nread; bind++);
+  if (bind == nread) {
+    if (nread < BUF_SIZE) // done reading file
+      return -1; // EOF (or potentially error) reached
+    else { // more to read
+      // TODO!
+//      nread = fread(curBuf, sizeof(char), BUF_SIZE, in);
+      return 0;
+    }
   }
+  else if (curBuf[bind] == EOF) // done reading file? end loop
+    return -1;
 
-  return c;
+  return 1;
 }
 
 // Updates the size and location of windows so that the first window starts
