@@ -296,7 +296,7 @@ bool skipWhitespace(char *curBuf, int &bind, size_t nread, const int BUF_SIZE) {
 // Switch "buf_ind " to "bind"
 int readDoubleBuffer(FILE *in, char *field, char *curBuf, char *nextBuf, int BUF_SIZE, int buf_ind, size_t nread){
     // First skip leading whitespace...
-    bool status = skipWhitespace(curBuf, buf_ind, nread, BUF_SIZE);
+    int status = skipWhitespace(curBuf, buf_ind, nread, BUF_SIZE);
     if (status < 0) return status; // We have reached EOF
     int mstart = buf_ind;
     field = &curBuf[mstart];
