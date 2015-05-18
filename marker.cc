@@ -340,11 +340,11 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
   char *curBuf, *nextBuf;
   size_t nread; // number of chars read into <curBuf>
   int bind = 0; // current buffer index in <curBuf> (during parsing below)
-  // TODO: rename, remove
   // TODO: we could realistically only have one "field pointer right?"
-  char *markerNameX;
-  char *chromNameX;
-  char *tmpStrX;
+  // aab227 : set all to null so no warnings
+  char *markerNameX = NULL;
+  char *chromNameX = NULL;
+  char *tmpStrX = NULL;
   std::string markerName;
   std::string chromName;
   std::string tmpStr;
