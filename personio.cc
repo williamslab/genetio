@@ -436,7 +436,7 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
 
   // <header->samples> stores the identifiers for the samples, <header->n[2]>
   // stores the number of samples.
-  PersonIO<PersonBits>::makePersonsFromIds(header->samples, header->n[2]);
+  PersonIO<P>::makePersonsFromIds(header->samples, header->n[2]);
 
   // no longer need header:
   bcf_hdr_destroy(header);
