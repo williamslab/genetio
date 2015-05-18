@@ -731,7 +731,13 @@ Marker::Marker(const char *markerName, int chromIdx, float mapPos,
 }
 
 // Compute allele frequency stats
-void Marker::setAlleleFreq(int alleleCount, int totalGenoWithData) {
+void Marker::setAlleleFreq(int alleleCount, int totalGenoWithData,
+			   bool nonStandardGeno) {
+  if (nonStandardGeno) {
+    _logAlleleFreq = _logVarAlleleFreq = 1; // illegal log value
+    return;
+  }
+
   // calling allele 1 the variant allele, though it need not be:
   float variantFrequency = (float) alleleCount / (2 * totalGenoWithData);
   float referenceFrequency = 1 - variantFrequency;

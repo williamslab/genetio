@@ -97,7 +97,8 @@ class Marker {
     float getLogAlleleFreq() const      { return _logAlleleFreq; }
     float getLogVarAlleleFreq() const   { return _logVarAlleleFreq; }
     float getNumMarkersInWindow() const { return _numSNPsWindow; }
-    void setAlleleFreq(int alleleCount, int totalGenoWithData);
+    void setAlleleFreq(int alleleCount, int totalGenoWithData,
+		       bool nonStandardGenotype = false);
 
 
   private:
