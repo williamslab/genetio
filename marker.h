@@ -97,7 +97,8 @@ class Marker {
     float getLogAlleleFreq() const      { return _logAlleleFreq; }
     float getLogVarAlleleFreq() const   { return _logVarAlleleFreq; }
     float getNumMarkersInWindow() const { return _numSNPsWindow; }
-    void setAlleleFreq(int alleleCount, int totalGenoWithData);
+    void setAlleleFreq(int alleleCount, int totalGenoWithData,
+		       bool nonStandardGenotype = false);
 
 
   private:
@@ -111,15 +112,9 @@ class Marker {
 
     static void readMarkers(FILE *in, const char *onlyChr, int type,
 			    int startPos, int endPos);
-
-    static int skipWhitespace(char *buf, int &bind, size_t nread,
-			      const int BUF_SIZE);
-
-   	static int readDoubleBuffer(FILE *in, char *field, char *curBuf,
-    	 char *nextBuf, const int BUF_SIZE, int bind, size_t nread);
-
     static void updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom);
     static void setNumMarkersInWindow(int startMarkerNum, int numMarkers);
+    static char readToken(FILE *in, std::string &toStr);
 
     // marker name (usually SNP rs id)
     char *_name;

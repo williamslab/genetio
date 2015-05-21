@@ -1261,8 +1261,9 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
   int chromIdx = Marker::getMarker(0)->getChromIdx();
 
   // For computing allele frequencies for the current marker:
-  int alleleCount;    // init'd below
+  int alleleCount;      // init'd below
   int totalGenotypes;
+  bool nonStandardGeno; // any genotypes besides 0 and 1? Can't calculate AF
 
   int numMarkersToRead = Marker::getNumMarkers();
 
@@ -1289,6 +1290,7 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
 
     alleleCount = 0;
     totalGenotypes = 0;
+    nonStandardGeno = false;
 
     if (Marker::getLastMarkerNum(chromIdx) == curMarkerIdx - 1) {
       // shouldn't be last chrom
@@ -1419,7 +1421,10 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
       P::_allIndivs[curPersonIdx]->setGenotype(curHapChunk, curChunkIdx,
 					       chromIdx, chromMarkerIdx, geno);
 
-      if (geno[0] >= 0) {
+      if (geno[0] > 1 || geno[1] > 1) {
+	nonStandardGeno = true;
+      }
+      else if (geno[0] >= 0) {
 	alleleCount += geno[0] + geno[1];
 	totalGenotypes++;
       }
@@ -1452,7 +1457,8 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
     }
 
     Marker::getMarkerNonConst(curMarkerIdx)->setAlleleFreq(alleleCount,
-							   totalGenotypes);
+							   totalGenotypes,
+							   nonStandardGeno);
     // increment marker num:
     curChunkIdx++;
     chromMarkerIdx++;
