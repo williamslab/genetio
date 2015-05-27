@@ -2,6 +2,8 @@ CPPSRCS= marker.cc util.cc hapi-ur-util.cc personio.cc personbits.cc superperson
 CSRCS= 
 OBJS= $(patsubst %.cc,%.o,$(CPPSRCS)) $(patsubst %.c,%.o,$(CSRCS))
 LIB= libgenetio.a
+LNLIB= /usr/local/lib/$(LIB)
+INCLOC= /usr/local/include/genetio/
 
 GPP = g++
 GCC = gcc
@@ -20,10 +22,16 @@ CPPFLAGS = -std=c++11 $(CFLAGS)
 DEPDIR = .deps
 df = $(DEPDIR)/$(*F)
 
-all: $(LIB)
-
-$(LIB): $(OBJS) $(HEADERS)
+$(MAKE): $(OBJS) $(HEADERS)
 	$(AR) -cvq $(LIB) $(OBJS)
+
+all: $(MAKE)
+
+install: 
+	$(MAKE)
+	ln -s $(LIB) $(LNLIB)
+	mkdir $(INCLOC)
+	ln -s *.h $(INCLOC)
 
 # This way of building dependencies (per-file) described at
 # http://make.paulandlesley.org/autodep.html
@@ -55,6 +63,9 @@ tags: $(SRCS) *.h
 
 clean:
 	rm -f $(LIB) $(OBJS)
+	unlink $(LNLIB)
+	rm -f $(LNLIB)
+	rm -rf $(INCLOC)
 
 clean-deps:
 	rm -f $(DEPDIR)/*.P
