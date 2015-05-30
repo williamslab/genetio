@@ -29,9 +29,9 @@ all: $(MAKE)
 
 install: 
 	$(MAKE)
-	ln -s $(LIB) $(LNLIB)
+	ln $(LIB) $(LNLIB)
 	mkdir $(INCLOC)
-	ln -s *.h $(INCLOC)
+	ln *.h $(INCLOC)
 
 # This way of building dependencies (per-file) described at
 # http://make.paulandlesley.org/autodep.html
