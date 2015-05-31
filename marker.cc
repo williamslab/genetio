@@ -293,26 +293,37 @@ bool skipWhitespace(char *curBuf, int &bind, size_t nread, const int BUF_SIZE) {
 
 // Helper function for setting appropriate null character points
 // TODO : naming of function
-// Switch "buf_ind " to "bind"
-int readDoubleBuffer(FILE *in, char *field, char *curBuf, char *nextBuf, int BUF_SIZE, int buf_ind, size_t nread){
+int readDoubleBuffer(FILE *in, char *& field, char *& curBuf, char *& nextBuf, int BUF_SIZE, int buf_ind, size_t nread){
     // First skip leading whitespace...
     int status = skipWhitespace(curBuf, buf_ind, nread, BUF_SIZE);
     if (status < 0) return status; // We have reached EOF
+    fprintf(stdout, "Buffer index at beginning of call: %d\n", buf_ind);
     int mstart = buf_ind;
     field = &curBuf[mstart];
+    // printf("Address of field is %p\n", (void *)field);
+    // Read until you hit a space...
     for ( ; !isspace(curBuf[buf_ind]) && buf_ind < nread; buf_ind++)
     ;	 
     if (buf_ind == nread) {
-      // reached end of curBuf and markerName is incomplete; copy into
-      // <nextBuf> and then read more into that buffer
+      fprintf(stdout, "%s\n", "WE HAVE REACHED THE END OF OUR BUFFER");
+      // reached end of curBuf and field is incomplete; copy into
+      // <nextBuf> and then read more into that buffer 
       int numCpy = nread - mstart;
-      strncpy(nextBuf, field, nread - mstart);
+      strncpy(nextBuf, field, numCpy);
+      // fprintf(stdout, "nextBuf after strncpy!:\n %s\n", nextBuf);
       fread(&nextBuf[numCpy], sizeof(char), BUF_SIZE - numCpy, in);
-      field = &nextBuf[0];
+      // field = &nextBuf[0]; 
 
+      // Why do we need to swap here?
+      // NOTE : the pointers themselves will not change...
+      // We will have to do some magic in here
       char *tmpBuf = curBuf;
       curBuf = nextBuf;
       nextBuf = tmpBuf;
+      field = &curBuf[0];
+      // fprintf(stdout, "This is what is in the current buffer:\n %s\n", curBuf);
+
+      // exit(1);
       // now get the end of the field
       buf_ind = numCpy;
       for ( ; !isspace(curBuf[buf_ind]) && buf_ind < nread; buf_ind++);
@@ -323,6 +334,13 @@ int readDoubleBuffer(FILE *in, char *field, char *curBuf, char *nextBuf, int BUF
 
     // null terminate field by inserting '\0' in curBuf:
     curBuf[buf_ind] = '\0';  
+
+    // TODO : Printing the buffer...
+    fprintf(stdout, "%s\n", (void *)field);
+
+    // Increment by 1 to get to next character...
+    buf_ind++;
+    fprintf(stdout, "Buffer index at end of call: %d\n", buf_ind);
 
     // Return the current buffer index so that we can pick up where we left off
     return buf_ind;
@@ -340,10 +358,9 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
   char *curBuf, *nextBuf;
   size_t nread; // number of chars read into <curBuf>
   int bind = 0; // current buffer index in <curBuf> (during parsing below)
-  // TODO: we could realistically only have one "field pointer right?"
   // aab227 : set all to null so no warnings
-  char *markerNameX = NULL;
-  char *chromNameX = NULL;
+  // char *markerNameX = NULL;
+  // char *chromNameX = NULL;
   char *tmpStrX = NULL;
   std::string markerName;
   std::string chromName;
@@ -361,7 +378,9 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 
   curBuf = buf1;
   nextBuf = buf2;
+
   nread = fread(curBuf, sizeof(char), BUF_SIZE, in);
+  fprintf(stdout, "Current Buffer at Start!:\n %s\n", curBuf);
 
   while (1) {
     // Note: I assume the map positions are in Morgans per the spec of both
@@ -369,29 +388,34 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
     if (type == 1) {
 
       // get the marker name
-      bind = readDoubleBuffer(in, markerNameX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
       // Actually setting the markername from the char pointer
-      markerName.assign(markerNameX);
+      markerName.assign(tmpStrX);
+      fprintf(stdout, "Marker Name: %s\n", tmpStrX);
 
       // get the chromosome name
-      bind = readDoubleBuffer(in, chromNameX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
       // setting the chomosome name
-      chromName.assign(chromNameX);
+      chromName.assign(tmpStrX);
+      fprintf(stdout, "Chromosome Name: %s\n", tmpStrX);
 
-      // get the genetic map position
+      // // get the genetic map position
       bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
       // Reading in the float for map posittion
       tmpStr.assign(tmpStrX);
       mapPos = atof(tmpStr.c_str());
+      fprintf(stdout, "Genetic Position: %f\n", mapPos);
 
-      // Get the physical position of the variant
+      // // // Get the physical position of the variant
       bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
       tmpStr.assign(tmpStrX);
       physPos = atoi(tmpStr.c_str());
+      fprintf(stdout, "Physical Position: %d\n", physPos);
+
 
       // // // readToken(in, markerName); // read marker name
       // // if (fgetc(in) == EOF) break; // done reading file 
@@ -402,26 +426,52 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       // readToken(in, tmpStr);     // read physical position, then convert to int
       // physPos = atoi(tmpStr.c_str());
 
-      // this loop ends when the allele gets read:
-      while(isspace(alleles[0] = fgetc(in))); // read first allele
-      char c = fgetc(in);
-      if (c != ' ' && c != '\t') {
-				fprintf(stderr, "ERROR: alleles expected to be single characters\n");
-				fprintf(stderr, "At marker %s\n", markerName.c_str());
-				exit(1);
-      }
-      // Note: index 1 is a space
-      while(isspace(alleles[2] = fgetc(in))); // read second allele
+      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      if (bind < 0) break;
+      tmpStr.assign(tmpStrX);
+      // Allele should idealy only be one character...
+      assert(tmpStr.size() == sizeof(char));
+      alleles[0] = tmpStr[0];
+      // alleles[0].assign(tmpStrX);
+      // fprintf(stdout, "ALLELE 1: %s\n", tmpStrX);
 
-      // read to the end of the line
-      while (isspace(c = fgetc(in)) && c != '\n' && c != EOF);
+      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      if (bind < 0) break;
+      tmpStr.assign(tmpStrX);
+      assert(tmpStr.size() == sizeof(char));
+      alleles[2] = tmpStr[0];
 
-      if (c == EOF) break; // done reading file
-      else if (c != '\n') {
-				fprintf(stderr, "ERROR: extra characters on line for marker %s\n",
-					markerName.c_str());
-				exit(1);
-      }
+      fprintf(stdout, "Alleles : %s\n", alleles);
+      // alleles[2].assign(tmpStrX);
+      // fprintf(stdout, "ALLELE 2: %s\n", tmpStrX);
+
+    //   // this loop ends when the allele gets read:
+    //   while(isspace(alleles[0] = fgetc(in))); // read first allele
+    //   char c = fgetc(in);
+    //   if (c != ' ' && c != '\t') {
+				// fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+				// fprintf(stderr, "At marker %s\n", markerName.c_str());
+				// exit(1);
+    //   }
+    //   // Note: index 1 is a space
+    //   while(isspace(alleles[2] = fgetc(in))); // read second allele
+
+    //   fprintf(stdout, "This is the current reading of the alleles: %s\n", alleles);
+
+    //   // read to the end of the line
+    //   while (isspace(c = fgetc(in)) && c != '\n' && c != EOF);
+
+    //   // This is just to print the alleles I think...
+    //   // fprintf(stdout, "%s\n", alleles);
+
+    //   if (c == EOF) break; // done reading file
+    //   else if (c != '\n') {
+
+				// fprintf(stderr, "ERROR: extra characters on line for marker %s\n",
+				// 	markerName.c_str());
+				// exit(1);
+    //   }
+      fprintf(stdout, "Done reading marker %s\n", markerName.c_str());
     }
     else if (type == 2 || type == 3) {
       // TODO : remove dependence on this single character...
@@ -430,14 +480,14 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       // if (c == EOF) // done reading file
 
       // read in the chromosome name
-      bind = readDoubleBuffer(in, chromNameX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      chromName.assign(chromNameX);
+      chromName.assign(tmpStrX);
 
       // read in the marker name
-      bind = readDoubleBuffer(in, markerNameX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      markerName.assign(markerNameX);
+      markerName.assign(tmpStrX);
 
       // readToken(in, markerName); // read marker name
       // readToken(in, tmpStr);     // read map position, then convert to float
