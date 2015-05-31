@@ -428,9 +428,6 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
     //   // read to the end of the line
     //   while (isspace(c = fgetc(in)) && c != '\n' && c != EOF);
 
-    //   // This is just to print the alleles I think...
-    //   // fprintf(stdout, "%s\n", alleles);
-
     //   if (c == EOF) break; // done reading file
     //   else if (c != '\n') {
 
@@ -441,9 +438,7 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
     }
     else if (type == 2 || type == 3) {
       // TODO : remove dependence on this single character...
-      char c; 
-      // c = readToken(in, chromName); // read chromosome
-      // if (c == EOF) // done reading file
+      // char c; 
 
       // read in the chromosome name
       bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
@@ -455,18 +450,11 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       if (bind < 0) break;
       markerName.assign(tmpStrX);
 
-      // readToken(in, markerName); // read marker name
-      // readToken(in, tmpStr);     // read map position, then convert to float
-      // mapPos = atof(tmpStr.c_str());
-
       // read in genetic map position
       bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
       tmpStr.assign(tmpStrX);
       mapPos = atof(tmpStr.c_str());
-
-      // readToken(in, tmpStr);     // read physical position, then convert to int
-      // physPos = atoi(tmpStr.c_str());
 
       // read in physical position
       bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
@@ -476,28 +464,34 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 
 
       if (type == 3) { // for .bim files, must read alleles
-	// this loop ends when the allele gets read:
-	while(isspace(alleles[0] = fgetc(in))); // read first allele
-	c = fgetc(in);
-	if (c != ' ' && c != '\t') {
-	  fprintf(stderr, "ERROR: alleles expected to be single characters\n");
-	  fprintf(stderr, "At marker %s\n", markerName.c_str());
-	  exit(1);
-	}
-	// Note: index 1 is a space
-	while(isspace(alleles[2] = fgetc(in))); // read second allele
-      }
+      	// this loop ends when the allele gets read:
+      	// while(isspace(alleles[0] = fgetc(in))); // read first allele
+      	// c = fgetc(in);
+      	// if (c != ' ' && c != '\t') {
+      	//   fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+      	//   fprintf(stderr, "At marker %s\n", markerName.c_str());
+      	//   exit(1);
+      	// }
+      	// // Note: index 1 is a space
+      	// while(isspace(alleles[2] = fgetc(in))); // read second allele
+        bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+        if (bind < 0) break;
+        tmpStr.assign(tmpStrX);
+        // Allele should ideally only be one character...
+        assert(tmpStr.size() == sizeof(char));
+        alleles[0] = tmpStr[0];
 
-      // read to the end of the line
-      while (isspace(c = fgetc(in)) && c != '\n' && c != EOF);
-
-      if (c == EOF)
-	break; // done reading file
-      else if (c != '\n') {
-	fprintf(stderr, "ERROR: extra characters on line for marker %s\n",
-		markerName.c_str());
-	exit(1);
+        bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+        if (bind < 0) break;
+        tmpStr.assign(tmpStrX);
+        assert(tmpStr.size() == sizeof(char));
+        alleles[2] = tmpStr[0];
       }
+ //      else if (c != '\n') {
+	// fprintf(stderr, "ERROR: extra characters on line for marker %s\n",
+	// 	markerName.c_str());
+	// exit(1);
+ //      }
     }
     else {
       fprintf(stderr, "ERROR: unknown marker file type %d!\n", type);
