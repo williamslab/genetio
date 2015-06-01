@@ -8,6 +8,8 @@
 #include <math.h>
 #include "marker.h"
 
+#include "timer.h"
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
@@ -402,7 +404,8 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       // TODO : ask Amy what the protocol is for this...
       // Should we just not include the variant if it is not a SNP?
       if (tmpStr.size() != sizeof(char)){
-        fprintf(stderr, "Alleles at %s are more than one character\n", markerName.c_str());
+        fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+        fprintf(stderr, "At marker %s\n", markerName.c_str());
         exit(1);
       } 
       alleles[0] = tmpStr[0];
@@ -412,11 +415,14 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       tmpStr.assign(tmpStrX);
       // assert(tmpStr.size() == sizeof(char));
       if (tmpStr.size() != sizeof(char)){
-        fprintf(stderr, "Alleles at %s are more than one character\n", markerName.c_str());
+        fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+        fprintf(stderr, "At marker %s\n", markerName.c_str());
         exit(1);
       } 
       alleles[2] = tmpStr[0];
 
+      // fprintf(stdout, "Left in Buffer:\n %s", &curBuf[bind]);
+      // status = skipWhitespace()
 
       // TODO : check if there is extra material on the line...
 
