@@ -341,7 +341,7 @@ int readDoubleBuffer(FILE *in, char *& field, char *& curBuf, char *& nextBuf, i
 void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 			 int endPos) {
   // TODO (aab227) : tune buffer size?
-  const int BUF_SIZE = 1024;
+  const int BUF_SIZE = 2048;
   char buf1[BUF_SIZE], buf2[BUF_SIZE];
   char *curBuf, *nextBuf;
   size_t nread; // number of chars read into <curBuf>
@@ -399,14 +399,22 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
       tmpStr.assign(tmpStrX);
-      // Allele should ideally only be one character...
-      assert(tmpStr.size() == sizeof(char));
+      // TODO : ask Amy what the protocol is for this...
+      // Should we just not include the variant if it is not a SNP?
+      if (tmpStr.size() != sizeof(char)){
+        fprintf(stderr, "Alleles at %s are more than one character\n", markerName.c_str());
+        exit(1);
+      } 
       alleles[0] = tmpStr[0];
 
       bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
       tmpStr.assign(tmpStrX);
-      assert(tmpStr.size() == sizeof(char));
+      // assert(tmpStr.size() == sizeof(char));
+      if (tmpStr.size() != sizeof(char)){
+        fprintf(stderr, "Alleles at %s are more than one character\n", markerName.c_str());
+        exit(1);
+      } 
       alleles[2] = tmpStr[0];
 
 
@@ -477,14 +485,22 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
         bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
         if (bind < 0) break;
         tmpStr.assign(tmpStrX);
-        // Allele should ideally only be one character...
-        assert(tmpStr.size() == sizeof(char));
+        // Allele should only be one character...
+        // assert(tmpStr.size() == sizeof(char));
+        if (tmpStr.size() != sizeof(char)){
+          fprintf(stderr, "Alleles at %s are more than one character\n", markerName.c_str());
+          exit(1);
+        } 
         alleles[0] = tmpStr[0];
 
         bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
         if (bind < 0) break;
         tmpStr.assign(tmpStrX);
-        assert(tmpStr.size() == sizeof(char));
+        // assert(tmpStr.size() == sizeof(char));
+        if (tmpStr.size() != sizeof(char)){
+          fprintf(stderr, "Alleles at %s are more than one character\n", markerName.c_str());
+          exit(1);
+        } 
         alleles[2] = tmpStr[0];
       }
  //      else if (c != '\n') {
