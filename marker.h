@@ -38,6 +38,7 @@ class Marker {
     static void readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 			    int startPos, int endPos);
     static void printSNPFile(FILE *out);
+    static void printMapFile(FILE *out);
     static void printImpute2Prefix(FILE *out, int markerNum);
     static void printGzImpute2Prefix(gzFile out, int markerNum);
 

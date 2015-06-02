@@ -1170,19 +1170,19 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in) {
       
       int geno[2];
       switch (c) {
-	case '0':
-	  geno[0] = geno[1] = 0;
-	  break;
-	case '1':
-	  geno[0] = 0;
-	  geno[1] = 1;
-	  break;
-	case '2':
-	  geno[0] = geno[1] = 1;
-	  break;
-	case '9': // missing data
-	  geno[0] = geno[1] = -1;
-	  break;
+      	case '0':
+      	  geno[0] = geno[1] = 0;
+      	  break;
+      	case '1':
+      	  geno[0] = 0;
+      	  geno[1] = 1;
+      	  break;
+      	case '2':
+      	  geno[0] = geno[1] = 1;
+      	  break;
+      	case '9': // missing data
+      	  geno[0] = geno[1] = -1;
+      	  break;
       }
 
       P::_allIndivs[curPersonIdx]->setGenotype(curHapChunk, curChunkIdx,
@@ -1626,6 +1626,15 @@ void PersonIO<P>::printGzEigenstratPhased(gzFile out) {
     gzprintf(out, "\n");
   }
 }
+
+// Print an PLINK-formatted .ped file with all samples to <out>
+template <class P>
+void PersonIO<P>::printPed(FILE *out){
+
+}
+
+
+
 
 // Prints a phased ind file for the samples that were phased (those without an
 // Ignore label).  If <trioDuoOnly> is true, only prints the ids for parents of

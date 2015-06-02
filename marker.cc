@@ -242,6 +242,14 @@ void Marker::printSNPFile(FILE *out) {
   }
 }
 
+// Prints a .map (PLINK format) file
+void Marker::printMapFile(FILE *out){
+
+
+}
+
+
+
 // Prints the first 5 columns of an IMPUTE2 format .haps file (i.e., SNP
 // information)
 void Marker::printImpute2Prefix(FILE *out, int markerNum) {
