@@ -8,9 +8,6 @@
 #include <math.h>
 #include "marker.h"
 
-#include "timer.h"
-
-
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
 dynarray<Marker *> Marker::_allMarkers(600000);
