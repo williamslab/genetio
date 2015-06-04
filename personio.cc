@@ -1635,7 +1635,6 @@ void PersonIO<P>::printGzEigenstratPhased(gzFile out) {
 // Print an PLINK-formatted .ped file with all samples to <out>
 template <class P>
 void PersonIO<P>::printPed(FILE *out){
-  Timer t = Timer();
   int numMarkers = Marker::getNumMarkers();
   int numIndivs = P::_allIndivs.length();
 
@@ -1649,16 +1648,13 @@ void PersonIO<P>::printPed(FILE *out){
 
   // Iterate through all the individuals
   for (int i = 0; i < numIndivs; i++){
-    // Get all of the Individuals information and stuff...
     P *curIndiv = P::_allIndivs[i];
-    // Print the first six fields...
-    // TODO : read in phenotype? need to add field in individual for this...
-
     switch(curIndiv->getSex()){
       case 'M': sex = 1; break;
       case 'F': sex = 2; break;
       default:  sex = 0; break;
     }
+    // TODO : figure out how to include the phenotype
     fprintf(out, "%s\t%s\t%d\t%d\t%d\t%d", 
       curIndiv->getPopLabel(), curIndiv->getId(),
       0, 0, sex, 0);
@@ -1699,9 +1695,72 @@ void PersonIO<P>::printPed(FILE *out){
     }
     fprintf(out, "\n");
   }
-  fprintf(stdout, "Time to print PED File: %f\n", t.getElapsedSec());
 }
 
+// Print a gzip-compressed PLINK-formatted .ped.gz file with all samples to <out>
+template <class P>
+void PersonIO<P>::printGzPed(gzFile out){
+  int numMarkers = Marker::getNumMarkers();
+  int numIndivs = P::_allIndivs.length();
+
+  // Which haplotype chunk are we on?  (A chunk is BITS_PER_CHUNK bits)
+  int curHapChunk = 0;
+  // Which bit/locus within the chunk are we on?
+  int curChunkIdx = 0;
+
+  int sex;
+  int geno[2];
+
+  // Iterate through all the individuals
+  for (int i = 0; i < numIndivs; i++){
+    P *curIndiv = P::_allIndivs[i];
+    switch(curIndiv->getSex()){
+      case 'M': sex = 1; break;
+      case 'F': sex = 2; break;
+      default:  sex = 0; break;
+    }
+    // TODO : ask about how to work with a phenotype...
+    gzprintf(out, "%s\t%s\t%d\t%d\t%d\t%d", 
+      curIndiv->getPopLabel(), curIndiv->getId(),
+      0, 0, sex, 0);
+
+    // What marker index on the chromosome does the next genotype correspond to?
+    int chromMarkerIdx = 0;
+    // Which chromosome index are we currently on?
+    int chromIdx = Marker::getMarker(0)->getChromIdx();
+
+    for (int m = 0; m < numMarkers; m++){
+      if (Marker::getLastMarkerNum(chromIdx) == m - 1) {
+        // shouldn't be last chrom
+        assert(chromIdx < Marker::getNumChroms() - 1);
+
+        // Now on next chromosome; update chunk indices
+        if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
+          curHapChunk++; // markers for current chrom are on next chunk number
+          curChunkIdx = 0;
+        }
+
+        chromMarkerIdx = 0; // back to first marker on the new chromosome
+
+        chromIdx = Marker::getMarker(m)->getChromIdx();
+      }
+
+      geno[0] = curIndiv->getHapAllele(0, curHapChunk, curChunkIdx,
+               chromIdx, chromMarkerIdx);
+      geno[1] = curIndiv->getHapAllele(1, curHapChunk, curChunkIdx,
+               chromIdx, chromMarkerIdx);      
+      gzprintf(out, "\t%d\t%d", geno[0] >= 0 ? geno[0]+1 : 0, geno[1] >= 0 ? geno[1] + 1 : 0);
+
+      curChunkIdx++;
+      chromMarkerIdx++;
+      if (curChunkIdx == BITS_PER_CHUNK) {
+        curHapChunk++;
+        curChunkIdx = 0;
+      }
+    }
+    gzprintf(out, "\n");
+  }
+}
 
 
 

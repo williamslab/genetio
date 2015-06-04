@@ -45,6 +45,7 @@ class PersonIO {
     static void printEigenstratPhased(FILE *out, int numSamples = -1);
     static void printGzEigenstratPhased(gzFile out);
     static void printPed(FILE *out);
+    static void printGzPed(gzFile out);
     static void printPhasedIndFile(FILE *out, bool trioDuoOnly = false);
     static void printImpute2Haps(FILE *out);
     static void printGzImpute2Haps(gzFile out);
