@@ -376,7 +376,7 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
   nextBuf = buf2;
 
   nread = fread(curBuf, sizeof(char), BUF_SIZE, in);
-
+  
   while (1) {
     // Note: I assume the map positions are in Morgans per the spec of both
     // the Reich lab SNP file format and the spec of the PLINK .map file format
@@ -409,6 +409,7 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
       tmpStr.assign(tmpStrX);
+
       // TODO : ask Amy what the protocol is for this...
       // Should we just not include the variant if it is not a SNP?
       if (tmpStr.size() != sizeof(char)){
@@ -434,6 +435,8 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
         fprintf(stderr, "ERROR: extra characters on line for marker %s\n", markerName.c_str());
         exit(1);
       }
+      // Increment so marker name is not blank
+      bind++;
     }
     else if (type == 2 || type == 3) {
       // read in the chromosome name
@@ -464,7 +467,6 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
         if (bind < 0) break;
         tmpStr.assign(tmpStrX);
         // Allele should only be one character...
-        // assert(tmpStr.size() == sizeof(char));
         if (tmpStr.size() != sizeof(char)){
           fprintf(stderr, "ERROR: alleles expected to be single characters\n");
           fprintf(stderr, "At marker %s\n", markerName.c_str());
@@ -475,7 +477,6 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
         bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
         if (bind < 0) break;
         tmpStr.assign(tmpStrX);
-        // assert(tmpStr.size() == sizeof(char));
         if (tmpStr.size() != sizeof(char)){
           fprintf(stderr, "ERROR: alleles expected to be single characters\n");
           fprintf(stderr, "At marker %s\n", markerName.c_str());
