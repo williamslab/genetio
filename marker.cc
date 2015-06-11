@@ -247,8 +247,18 @@ void Marker::printSNPFile(FILE *out) {
 
 // Prints a .map (PLINK format) file
 void Marker::printMapFile(FILE *out){
+  int numMarkers = _allMarkers.length();
 
+  for (int m = 0; m < numMarkers; m++){
+    Marker *cur = _allMarkers[m];
 
+    // TODO : Bi-allelic only?
+    fprintf(out, "%s\t%s\t%1.12f\t%d\n", 
+      cur->getChromName(),
+      cur->getName(),
+      cur->getMapPos(),
+      cur->getPhysPos());
+  }
 }
 
 
