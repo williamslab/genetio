@@ -1,5 +1,5 @@
 // Library for I/O of genetic data
-// Author: Amy Williams <alw289 @ cornell edu>
+// Author: Amy Williams <alw289 cornell edu>
 //
 // This program is distributed under the terms of the GNU General Public License
 
@@ -248,11 +248,9 @@ void Marker::printSNPFile(FILE *out) {
 // Prints a .map (PLINK format) file
 void Marker::printMapFile(FILE *out){
   int numMarkers = _allMarkers.length();
-
   for (int m = 0; m < numMarkers; m++){
     Marker *cur = _allMarkers[m];
-
-    // TODO : Bi-allelic only?
+    // Bi-allelic SNPs only.
     fprintf(out, "%s\t%s\t%1.12f\t%d\n", 
       cur->getChromName(),
       cur->getName(),
@@ -293,14 +291,12 @@ void Marker::printGzImpute2Prefix(gzFile out, int markerNum) {
 	   cur->getPhysPos(), cur->_alleles);
 }
 
-bool skipWhitespace(char *curBuf, int &bind, size_t &nread, const int BUF_SIZE) {
+bool Marker::skipWhitespace(char *curBuf, int &bind, size_t &nread, const int BUF_SIZE) {
   for ( ; (curBuf[bind] == ' ' ||curBuf[bind] == '\t') && bind < nread; bind++);
   if (bind == nread) {
     if (nread < BUF_SIZE) // done reading file
       return -1; // EOF (or potentially error) reached
     else { // more to read
-      // TODO : aab227
-//      nread = fread(curBuf, sizeof(char), BUF_SIZE, in);
       return 0;
     }
   }
@@ -311,7 +307,7 @@ bool skipWhitespace(char *curBuf, int &bind, size_t &nread, const int BUF_SIZE) 
 }
 
 // Helper function for setting appropriate null character points
-int readDoubleBuffer(FILE *in, char *& field, char *& curBuf, char *& nextBuf, int BUF_SIZE, int buf_ind, size_t &nread){
+int Marker::readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, int BUF_SIZE, int buf_ind, size_t &nread){
     // First skip leading whitespace...
     int status = skipWhitespace(curBuf, buf_ind, nread, BUF_SIZE);
     if (status < 0) return status;
@@ -355,7 +351,6 @@ int readDoubleBuffer(FILE *in, char *& field, char *& curBuf, char *& nextBuf, i
     return buf_ind;
 }
 
-
 // Read marker/genetic map definition file of the following formats:
 // If type == 1, reads Reich lab format .snp file
 // If type == 2, reads PLINK format .map file
@@ -367,10 +362,9 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
   char *curBuf, *nextBuf;
   size_t nread; // number of chars read into <curBuf>
   int bind = 0; // current buffer index in <curBuf> (during parsing below)
-  char *tmpStrX = NULL;
+  char *tmpStr = NULL;
   std::string markerName;
   std::string chromName;
-  std::string tmpStr;
   int chromIdx = -1;
   Marker *prevMarker = NULL;
   float mapPos;
@@ -393,55 +387,52 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
     if (type == 1) {
 
       // get the marker name
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      markerName.assign(tmpStrX);
+      markerName.assign(tmpStr);
 
       // get the chromosome name
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
       // setting the chomosome name
-      chromName.assign(tmpStrX);
+      chromName.assign(tmpStr);
 
       // get the genetic map position
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      // Reading in the float for map posittion
-      tmpStr.assign(tmpStrX);
-      mapPos = atof(tmpStr.c_str());
+      // Reading in the float for map position
+      mapPos = atof(tmpStr);
 
       // Get the physical position
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      tmpStr.assign(tmpStrX);
-      physPos = atoi(tmpStr.c_str());
+      physPos = atoi(tmpStr);
 
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      tmpStr.assign(tmpStrX);
 
       // TODO : ask Amy what the protocol is for this...
       // Should we just not include the variant if it is not a SNP?
-      if (tmpStr.size() != sizeof(char)){
+      if (strlen(&tmpStr[0]) != sizeof(char)){
         fprintf(stderr, "ERROR: alleles expected to be single characters\n");
         fprintf(stderr, "At marker %s\n", markerName.c_str());
         exit(1);
       } 
       alleles[0] = tmpStr[0];
 
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      tmpStr.assign(tmpStrX);
-      if (tmpStr.size() != sizeof(char)){
+      if (strlen(&tmpStr[0]) != sizeof(char)){
         fprintf(stderr, "ERROR: alleles expected to be single characters\n");
         fprintf(stderr, "At marker %s\n", markerName.c_str());
         exit(1);
       } 
       alleles[2] = tmpStr[0];
 
-      // Check if extra material on the line (i.e. newline check) 
+      // Check if extra material on the line (i.e. newline check)
+      // TODO : check what happens if there is space before a newline... 
       char c = curBuf[bind];
-      if (c != '\0'){ // If \n we would stop on a null character...
+      if (c != '\0' && c != EOF){ // If \n we would stop on a null character...
         fprintf(stderr, "ERROR: extra characters on line for marker %s\n", markerName.c_str());
         exit(1);
       }
@@ -450,56 +441,52 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
     }
     else if (type == 2 || type == 3) {
       // read in the chromosome name
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      chromName.assign(tmpStrX);
+      chromName.assign(tmpStr);
 
       // read in the marker name
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      markerName.assign(tmpStrX);
+      markerName.assign(tmpStr);
 
       // read in genetic map position
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      tmpStr.assign(tmpStrX);
-      mapPos = atof(tmpStr.c_str());
+      mapPos = atof(tmpStr);
 
       // read in physical position
-      bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+      bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
       if (bind < 0) break;
-      tmpStr.assign(tmpStrX);
-      physPos = atof(tmpStr.c_str());
-
+      physPos = atof(tmpStr);
 
       if (type == 3) { // for .bim files, must read alleles
-        bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+        bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
         if (bind < 0) break;
-        tmpStr.assign(tmpStrX);
         // Allele should only be one character...
-        if (tmpStr.size() != sizeof(char)){
+        if (strlen(&tmpStr[0]) != 1){
           fprintf(stderr, "ERROR: alleles expected to be single characters\n");
           fprintf(stderr, "At marker %s\n", markerName.c_str());
           exit(1);
         } 
         alleles[0] = tmpStr[0];
 
-        bind = readDoubleBuffer(in, tmpStrX, curBuf, nextBuf, BUF_SIZE, bind, nread);
+        bind = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, BUF_SIZE, bind, nread);
         if (bind < 0) break;
-        tmpStr.assign(tmpStrX);
-        if (tmpStr.size() != sizeof(char)){
+        if (strlen(&tmpStr[0]) != 1){
           fprintf(stderr, "ERROR: alleles expected to be single characters\n");
           fprintf(stderr, "At marker %s\n", markerName.c_str());
           exit(1);
         } 
         alleles[2] = tmpStr[0];
       }
-      // Check for leftover space on the line...
+
       char c = curBuf[bind];
-      if (c != '\0'){ // If \n we would stop on a null character...
+      if (c != '\0' && c != EOF){ // If \n we would stop on a null character...
         fprintf(stderr, "ERROR: extra characters on line for marker %s\n", markerName.c_str());
         exit(1);
       }
+      bind++;
     }
     else {
       fprintf(stderr, "ERROR: unknown marker file type %d!\n", type);
@@ -559,6 +546,7 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
     }
 
     float morganDistToPrev = 1.0f;
+
     if (prevMarker != NULL && chromIdx == prevMarker->_chromIdx) {
       // on second marker? update setGenetFromPhys
       if (_allMarkers.length() == 1) {
@@ -587,6 +575,12 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
     Marker *m = new Marker(markerName.c_str(), chromIdx, mapPos,
 			   morganDistToPrev, physPos,
 			   (type == 2) ? NULL : alleles, /*numAlleles=*/ 2);
+
+    // fprintf(stdout, "\n%s\t%s\t%f\t%d\n", 
+    //   m->getChromName(), 
+    //   m->getName(), 
+    //   m->getMapPos(), 
+    //   m->getPhysPos());
 
     if (prevMarker != NULL) {
       int prevChromIdx = prevMarker->_chromIdx;
