@@ -29,9 +29,9 @@ all: $(MAKE)
 
 install: 
 	$(MAKE)
-	ln $(LIB) $(LNLIB)
-	mkdir $(INCLOC)
-	ln *.h $(INCLOC)
+	ln -f $(LIB) $(LNLIB)
+	mkdir -p $(INCLOC)
+	ln -f *.h $(INCLOC)
 
 # This way of building dependencies (per-file) described at
 # http://make.paulandlesley.org/autodep.html
@@ -62,6 +62,10 @@ tags: $(SRCS) *.h
 	ctags --language-force=c++ --extra=+q --fields=+i --excmd=n *.c *.cc *.h
 
 clean:
+	rm -f $(LIB) $(OBJS)
+	rm -rf $(INCLOC)
+
+uninstall:
 	rm -f $(LIB) $(OBJS)
 	unlink $(LNLIB)
 	rm -f $(LNLIB)
