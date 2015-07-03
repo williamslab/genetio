@@ -307,15 +307,15 @@ bool Marker::skipWhitespace(char *curBuf, int &bind, size_t &nread, const int BU
 }
 
 // Helper function for setting appropriate null character points
-int Marker::readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, int BUF_SIZE, int buf_ind, size_t &nread){
+int Marker::readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, int BUF_SIZE, int bind, size_t &nread){
     // First skip leading whitespace...
-    int status = skipWhitespace(curBuf, buf_ind, nread, BUF_SIZE);
+    int status = skipWhitespace(curBuf, bind, nread, BUF_SIZE);
     if (status < 0) return status;
-    int mstart = buf_ind;
+    int mstart = bind;
     field = &curBuf[mstart];
     // Read until you hit a space...
-    for ( ; !isspace(curBuf[buf_ind]) && buf_ind < nread; buf_ind++);
-    if (buf_ind == nread) {
+    for ( ; !isspace(curBuf[bind]) && bind < nread; bind++);
+    if (bind == nread) {
       // reached end of curBuf and field is incomplete; copy into
       // <nextBuf> and then read more into that buffer 
       int numCpy = nread - mstart;
@@ -328,27 +328,27 @@ int Marker::readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextB
       field = &curBuf[0];
 
       // now get the end of the field
-      buf_ind = numCpy;
-      for ( ; !isspace(curBuf[buf_ind]) && buf_ind < nread; buf_ind++);
+      bind = numCpy;
+      for ( ; !isspace(curBuf[bind]) && bind < nread; bind++);
     }
 
-    if (buf_ind >= nread && nread < BUF_SIZE){
+    if (bind >= nread && nread < BUF_SIZE){
       return -1; // Reached EOF
     } 
 
-    assert(buf_ind < nread);
+    assert(bind < nread);
 
     // null terminate field by inserting '\0' in curBuf:
-    char c = curBuf[buf_ind];   
-    curBuf[buf_ind] = '\0';
+    char c = curBuf[bind];   
+    curBuf[bind] = '\0';
     
     // Increment by 1 to get to next character... 
     if (c != '\n'){
-      buf_ind++;
-    }  
+      bind++;
+    }
 
     // Return the current buffer index so that we can pick up where we left off
-    return buf_ind;
+    return bind;
 }
 
 // Read marker/genetic map definition file of the following formats:
