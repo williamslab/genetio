@@ -117,7 +117,7 @@ class Marker {
     static void setNumMarkersInWindow(int startMarkerNum, int numMarkers);
     static bool skipWhitespace(char *curBuf, int &bind, size_t &nread, const int BUF_SIZE);
     static void replaceBuffer(FILE *in, char *&curBuf, char *&nextBuf, int &bind, size_t &nread, const int BUF_SIZE);
-    static int readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, const int BUF_SIZE, int bind, size_t &nread);
+    static int readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, int bind, size_t &nread, const int BUF_SIZE);
 
     // marker name (usually SNP rs id)
     char *_name;

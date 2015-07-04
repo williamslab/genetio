@@ -539,7 +539,6 @@ bool PersonIO<P>::readPedOrFamFile(FILE *in, bool omitFamilyId,
 	       parentsids[1], &sex, &pheno) == 6) {
     int popIndex = (pheno < 0) ? 0 : pheno;
 
-    // TODO : does not currently allow for reading in quantitative data. 
     assert(popIndex <= 2);
 
     char sexLetter;
