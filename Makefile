@@ -63,7 +63,6 @@ tags: $(SRCS) *.h
 
 clean:
 	rm -f $(LIB) $(OBJS)
-	rm -rf $(INCLOC)
 
 uninstall:
 	rm -f $(LIB) $(OBJS)
