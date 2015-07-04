@@ -115,9 +115,9 @@ class Marker {
 			    int startPos, int endPos);
     static void updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom);
     static void setNumMarkersInWindow(int startMarkerNum, int numMarkers);
-    static char readToken(FILE *in, std::string &toStr);
     static bool skipWhitespace(char *curBuf, int &bind, size_t &nread, const int BUF_SIZE);
-    static int readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, int BUF_SIZE, int buf_ind, size_t &nread);
+    static void replaceBuffer(FILE *in, char *&curBuf, char *&nextBuf, int &bind, size_t &nread, const int BUF_SIZE);
+    static int readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, const int BUF_SIZE, int bind, size_t &nread);
 
     // marker name (usually SNP rs id)
     char *_name;
