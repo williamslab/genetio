@@ -306,6 +306,10 @@ bool Marker::skipWhitespace(char *curBuf, int &bind, size_t &nread, const int BU
   return 1;
 }
 
+void copyBuffer(char *&curBuf, char *&nextBuf){
+
+}
+
 // Helper function for setting appropriate null character points
 int Marker::readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, int BUF_SIZE, int bind, size_t &nread){
     // First skip leading whitespace...
@@ -431,13 +435,55 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 
       // Check if extra material on the line (i.e. newline check)
       // TODO : check what happens if there is space before a newline... 
+      // TODO : Code cleanup in this section and extend to other case
       char c = curBuf[bind];
       if (c != '\0' && c != EOF){ // If \n we would stop on a null character...
-        fprintf(stderr, "ERROR: extra characters on line for marker %s\n", markerName.c_str());
-        exit(1);
+        if (isspace(c) && bind < nread){
+          int status = skipWhitespace(curBuf, bind, nread, BUF_SIZE);
+          if (status == 0){
+            // TODO : make sure this case is resolved...
+            fprintf(stdout, "MORE TO READ IN SPECIAL CASE!\n");
+          }
+
+          // Check if character is indeed \n
+          if (curBuf[bind] != '\n'){
+            fprintf(stderr, "ERROR: extra characters on line for marker %s\n", markerName.c_str());
+            exit(1);            
+          }
+          // bind++;
+        } 
+        else if (bind == nread){
+          // Replace entire buffer in this case...
+          bind = 0;
+          nread = fread(&nextBuf[bind], sizeof(char), BUF_SIZE, in);
+          char *tmpBuf = curBuf;
+          curBuf = nextBuf;
+          nextBuf = tmpBuf;
+
+          skipWhitespace(curBuf, bind, nread, BUF_SIZE);
+          if (curBuf[bind] != '\n'){
+            fprintf(stderr, "ERROR: extra characters on line for marker %s\n", markerName.c_str());
+            exit(1);
+          }
+          // bind++;
+        } 
+        else{
+          fprintf(stderr, "ERROR: extra characters on line for marker %s\n", markerName.c_str());
+          exit(1);
+        }
       }
-      // Increment so marker name is not blank
+      // else{
       bind++;
+      // }
+
+      // // Printing SNP information after reading...
+      // fprintf(stdout, "%s\t%s\t%f\t%d\t%c\t%c\n", 
+      //   markerName.c_str(),
+      //   chromName.c_str(),
+      //   mapPos,
+      //   physPos,
+      //   alleles[0],
+      //   alleles[2]);
     }
     else if (type == 2 || type == 3) {
       // read in the chromosome name
@@ -575,12 +621,6 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
     Marker *m = new Marker(markerName.c_str(), chromIdx, mapPos,
 			   morganDistToPrev, physPos,
 			   (type == 2) ? NULL : alleles, /*numAlleles=*/ 2);
-
-    // fprintf(stdout, "\n%s\t%s\t%f\t%d\n", 
-    //   m->getChromName(), 
-    //   m->getName(), 
-    //   m->getMapPos(), 
-    //   m->getPhysPos());
 
     if (prevMarker != NULL) {
       int prevChromIdx = prevMarker->_chromIdx;
