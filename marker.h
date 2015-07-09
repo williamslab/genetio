@@ -115,9 +115,14 @@ class Marker {
 			    int startPos, int endPos);
     static void updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom);
     static void setNumMarkersInWindow(int startMarkerNum, int numMarkers);
-    static bool skipWhitespace(char *curBuf, int &bind, size_t &nread, const int BUF_SIZE);
-    static void replaceBuffer(FILE *in, char *&curBuf, char *&nextBuf, int &bind, size_t &nread, const int BUF_SIZE);
-    static int readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, int bind, size_t &nread, const int BUF_SIZE);
+    static bool skipWhitespace(char *curBuf, size_t &bind, size_t &nread,
+			       const size_t BUF_SIZE);
+    static void replaceBuffer(FILE *in, char *&curBuf, char *&nextBuf,
+			      size_t &bind, size_t &nread,
+			      const size_t BUF_SIZE);
+    static int readDoubleBuffer(FILE *in, char *&field, char *&curBuf,
+				char *&nextBuf, size_t bind, size_t &nread,
+				const size_t BUF_SIZE);
 
     // marker name (usually SNP rs id)
     char *_name;
