@@ -492,15 +492,15 @@ void PersonIO<P>::readIndivs(FILE *in) {
     else {
       bool foundPop = false;
       for(popIndex = 0; popIndex < P::_popLabels.length(); popIndex++) {
-	if (strcmp(pop, P::_popLabels[popIndex]) == 0) {
-	  foundPop = true;
-	  break;
-	}
+      	if (strcmp(pop, P::_popLabels[popIndex]) == 0) {
+      	  foundPop = true;
+      	  break;
+      	}
       }
       if (!foundPop) {
-	char *newPopLabel = new char[ strlen(pop) + 1 ];
-	strcpy(newPopLabel, pop);
-	P::_popLabels.append( newPopLabel );
+      	char *newPopLabel = new char[ strlen(pop) + 1 ];
+      	strcpy(newPopLabel, pop);
+      	P::_popLabels.append( newPopLabel );
       }
     }
     P *p = new P(id, sex, popIndex);
@@ -523,8 +523,8 @@ bool PersonIO<P>::readPedOrFamFile(FILE *in, bool omitFamilyId,
   bool isFamFile = knowIsFam;
   bool isPedFile = false;
 
-  char familyid[81], personid[81], parentsids[2][81], sex[81];
-  int pheno;
+  char familyid[81], personid[81], parentsids[2][81];
+  int sex, pheno;
   char fullid[162];
 
   // Make population labels corresponding to the phenotypes for printing to
@@ -535,18 +535,18 @@ bool PersonIO<P>::readPedOrFamFile(FILE *in, bool omitFamilyId,
 
   /////////////////////////////////////////////////////////////////////////////
   // First, read in all the individuals and create the Person objects:
-  while(fscanf(in, "%s %s %s %s %s %d", familyid, personid, parentsids[0],
-	       parentsids[1], sex, &pheno) == 6) {
+  while(fscanf(in, "%s %s %s %s %d %d", familyid, personid, parentsids[0],
+	       parentsids[1], &sex, &pheno) == 6) {
     int popIndex = (pheno < 0) ? 0 : pheno;
+
     assert(popIndex <= 2);
 
     char sexLetter;
-    if (strcmp(sex, "1") == 0)
-      sexLetter = 'M';
-    else if (strcmp(sex, "2") == 0)
-      sexLetter = 'F';
-    else
-      sexLetter = 'U';
+    switch(sex){
+      case 1 : sexLetter = 'M'; break;
+      case 2 : sexLetter = 'F'; break;
+      default : sexLetter = 'U'; break;
+    }
 
     P *thePerson;
     if (omitFamilyId) {
@@ -1053,14 +1053,14 @@ void PersonIO<P>::parsePackedGenotypes(FILE *in, int recordLen, char *buf,
 					       chromIdx, chromMarkerIdx, geno);
 
       if (geno[0] >= 0) {
-	alleleCount += geno[0] + geno[1];
-	totalGenotypes++;
+      	alleleCount += geno[0] + geno[1];
+      	totalGenotypes++;
       }
 
       if (type == 1)
-	charIdx -= 2;
+	      charIdx -= 2;
       else
-	charIdx += 2;
+	      charIdx += 2;
     }
 
     Marker::getMarkerNonConst(curMarkerIdx)->setAlleleFreq(alleleCount,
@@ -1164,25 +1164,25 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in) {
 
       // the genotype
       if (c != '0' && c != '1' && c != '2' && c != '9') {
-	fprintf(stderr, "\nERROR: bad character in genotype file: %c\n", c);
-	exit(1);
+      	fprintf(stderr, "\nERROR: bad character in genotype file: %c\n", c);
+      	exit(1);
       }
       
       int geno[2];
       switch (c) {
-	case '0':
-	  geno[0] = geno[1] = 0;
-	  break;
-	case '1':
-	  geno[0] = 0;
-	  geno[1] = 1;
-	  break;
-	case '2':
-	  geno[0] = geno[1] = 1;
-	  break;
-	case '9': // missing data
-	  geno[0] = geno[1] = -1;
-	  break;
+      	case '0':
+      	  geno[0] = geno[1] = 0;
+      	  break;
+      	case '1':
+      	  geno[0] = 0;
+      	  geno[1] = 1;
+      	  break;
+      	case '2':
+      	  geno[0] = geno[1] = 1;
+      	  break;
+      	case '9': // missing data
+      	  geno[0] = geno[1] = -1;
+      	  break;
       }
 
       P::_allIndivs[curPersonIdx]->setGenotype(curHapChunk, curChunkIdx,
@@ -1565,10 +1565,10 @@ void PersonIO<P>::printEigenstratPhased(FILE *out, int numSamples) {
 	continue;
 
       for(int h = 0; h < 2; h++) {
-	int hapAllele = P::_allIndivs[i]->getHapAllele(h, curHapChunk,
-						       curChunkIdx, chromIdx,
-						       chromMarkerIdx);
-	fprintf(out, "%d", hapAllele);
+      	int hapAllele = P::_allIndivs[i]->getHapAllele(h, curHapChunk,
+      						       curChunkIdx, chromIdx,
+      						       chromMarkerIdx);
+      	fprintf(out, "%d", hapAllele);
       }
     }
     fprintf(out, "\n");
@@ -1624,6 +1624,71 @@ void PersonIO<P>::printGzEigenstratPhased(gzFile out) {
       }
     }
     gzprintf(out, "\n");
+  }
+}
+
+// Print an PLINK-formatted .ped file with all samples to <out>
+template <class P>
+void PersonIO<P>::printPed(FILE *out){
+  int numMarkers = Marker::getNumMarkers();
+  int numIndivs = P::_allIndivs.length();
+
+  // Which haplotype chunk are we on?  (A chunk is BITS_PER_CHUNK bits)
+  int curHapChunk = 0;
+  // Which bit/locus within the chunk are we on?
+  int curChunkIdx = 0;
+
+  int sex;
+  int geno[2];
+
+  // Iterate through all the individuals
+  for (int i = 0; i < numIndivs; i++){
+    P *curIndiv = P::_allIndivs[i];
+    switch(curIndiv->getSex()){
+      case 'M': sex = 1; break;
+      case 'F': sex = 2; break;
+      default:  sex = 0; break;
+    }
+    // TODO : figure out how to include the phenotype
+    fprintf(out, "%s\t%s\t%d\t%d\t%d\t%d", 
+      curIndiv->getPopLabel(), curIndiv->getId(),
+      0, 0, sex, 0);
+
+    // What marker index on the chromosome does the next genotype correspond to?
+    int chromMarkerIdx = 0;
+    // Which chromosome index are we currently on?
+    int chromIdx = Marker::getMarker(0)->getChromIdx();
+
+    for (int m = 0; m < numMarkers; m++){
+      if (Marker::getLastMarkerNum(chromIdx) == m - 1) {
+        // shouldn't be last chrom
+        assert(chromIdx < Marker::getNumChroms() - 1);
+
+        // Now on next chromosome; update chunk indices
+        if (curChunkIdx != 0) { // markers from prev chrom on current chunk?
+          curHapChunk++; // markers for current chrom are on next chunk number
+          curChunkIdx = 0;
+        }
+
+        chromMarkerIdx = 0; // back to first marker on the new chromosome
+
+        chromIdx = Marker::getMarker(m)->getChromIdx();
+      }
+
+      geno[0] = curIndiv->getHapAllele(0, curHapChunk, curChunkIdx,
+               chromIdx, chromMarkerIdx);
+      geno[1] = curIndiv->getHapAllele(1, curHapChunk, curChunkIdx,
+               chromIdx, chromMarkerIdx);      
+      fprintf(out, "\t%d\t%d", geno[0] >= 0 ? geno[0]+1 : 0, geno[1] >= 0 ? geno[1] + 1 : 0);
+
+      curChunkIdx++;
+      chromMarkerIdx++;
+      if (curChunkIdx == BITS_PER_CHUNK) {
+        curHapChunk++;
+        curChunkIdx = 0;
+      }
+    }
+    fprintf(out, "\n");
   }
 }
 

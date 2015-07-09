@@ -38,6 +38,7 @@ class Marker {
     static void readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 			    int startPos, int endPos);
     static void printSNPFile(FILE *out);
+    static void printMapFile(FILE *out);
     static void printImpute2Prefix(FILE *out, int markerNum);
     static void printGzImpute2Prefix(gzFile out, int markerNum);
 
@@ -114,7 +115,9 @@ class Marker {
 			    int startPos, int endPos);
     static void updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom);
     static void setNumMarkersInWindow(int startMarkerNum, int numMarkers);
-    static char readToken(FILE *in, std::string &toStr);
+    static bool skipWhitespace(char *curBuf, int &bind, size_t &nread, const int BUF_SIZE);
+    static void replaceBuffer(FILE *in, char *&curBuf, char *&nextBuf, int &bind, size_t &nread, const int BUF_SIZE);
+    static int readDoubleBuffer(FILE *in, char *&field, char *&curBuf, char *&nextBuf, int bind, size_t &nread, const int BUF_SIZE);
 
     // marker name (usually SNP rs id)
     char *_name;
