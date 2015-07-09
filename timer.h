@@ -9,9 +9,12 @@
 #define CLOCK_REALTIME 0 
 #define CLOCK_MONOTONIC 0
 
-// #include <sys/time.h>
-#ifdef __MACH__
 #include <sys/time.h>
+#include <time.h>
+#include <stdio.h>
+#include <assert.h>
+
+#ifdef __MACH__
 //clock_gettime is not implemented on OSX
 int clock_gettime(int /*clk_id*/, struct timespec* t) {
     struct timeval now;
@@ -22,12 +25,6 @@ int clock_gettime(int /*clk_id*/, struct timespec* t) {
     return 0;
 }
 #endif
-
-#include <time.h>
-#include <stdio.h>
-#include <assert.h>
-
-
 
 class Timer {
   public:
