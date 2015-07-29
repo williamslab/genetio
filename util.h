@@ -48,6 +48,16 @@ inline double sumLogLikelihood(double a, double b) {
   }
 }
 
+inline double minusLogLikelihood(double a, double b) {
+  if (a > b) {
+    return a + log(1 - exp(b - a));
+  }
+  else {
+    return b + log(1 - exp(a - b));
+  }
+}
+
+
 int  intHashFunc(const int &key);
 bool intEqualFunc(const int &v1, const int &v2);
 int  pairIntHashFunc(const PairIdx<int> &key);
