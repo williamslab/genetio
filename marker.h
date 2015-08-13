@@ -64,6 +64,7 @@ class Marker {
 
     static int getFirstMarkerNumForChunk(int chromIdx, int chunkNum);
 
+    static const char * getChromName(int chrIdx) {return _chromNames[ chrIdx ];}
     static const Marker * getMarker(int num) { return _allMarkers[num]; }
 
     // cheating in order to set allele frequencies and/or add alleles for .ped:
