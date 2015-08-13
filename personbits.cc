@@ -128,7 +128,7 @@ void PersonBits::setParents(char *familyid, PersonBits *parents[2],
   inferTrioDuoHaplotypes(this, parents, numMendelError, numMendelCounted);
 
   if (numMendelError != NULL || numMendelCounted != NULL) {
-    assert(numMendelError != NULL || numMendelCounted != NULL);
+    assert(numMendelError != NULL && numMendelCounted != NULL);
 
     // Don't want errors for the purpose of counting non-Mendelian errors when
     // other relationships for the same person (e.g., parents of several
@@ -259,7 +259,8 @@ void PersonBits::inferTrioDuoHaplotypes(PersonBits *child,
     //////////////////////////////////////////////////////////////////////////
     // check for Mendelian errors
 
-    if (!childMissing && (!parentsMissing[0] || !parentsMissing[1]))
+    if (!childMissing && (!parentsMissing[0] || !parentsMissing[1]) &&
+	numMendelCounted != NULL)
       // for rate calculation: should only count observations where child and
       // at least one parent is non-missing
       numMendelCounted[m]++;
@@ -273,20 +274,23 @@ void PersonBits::inferTrioDuoHaplotypes(PersonBits *child,
 	  if (childGeno == 1) {
 	    // Mendelian error!
 	    setTrioDuoMissing(child, parents, curHapChunk, curChunkIdx);
-	    numMendelError[m]++;
+	    if (numMendelError != NULL)
+	      numMendelError[m]++;
 	    continue;
 	  }
 	  else if (childGeno / 2 != childHomozyAllele) {
 	    // Mendelian error!
 	    setTrioDuoMissing(child, parents, curHapChunk, curChunkIdx);
-	    numMendelError[m]++;
+	    if (numMendelError != NULL)
+	      numMendelError[m]++;
 	    continue;
 	  }
 	}
 	else if (childGeno != 1) {
 	  // Mendelian error!
 	  setTrioDuoMissing(child, parents, curHapChunk, curChunkIdx);
-	  numMendelError[m]++;
+	  if (numMendelError != NULL)
+	    numMendelError[m]++;
 	  continue;
 	}
       }
@@ -308,7 +312,8 @@ void PersonBits::inferTrioDuoHaplotypes(PersonBits *child,
 	  if (parHomozyAllele != childHomozyAllele) {
 	    // Mendelian error!
 	    setTrioDuoMissing(child, parents, curHapChunk, curChunkIdx);
-	    numMendelError[m]++;
+	    if (numMendelError != NULL)
+	      numMendelError[m]++;
 	    continue;
 	  }
 	}

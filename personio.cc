@@ -257,8 +257,9 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
       fprintf(out, "Rereading fam file to identify family relationships... ");
     }
 
-    findRelationships(indivIn, log, noFamilyId, *numMendelError,
-		      *numMendelCounted);
+    findRelationships(indivIn, log, noFamilyId,
+		      (numMendelError == NULL) ? NULL : *numMendelError,
+		      (numMendelCounted == NULL) ? NULL : *numMendelCounted);
     for (int o = 0; o < 2; o++) {
       FILE *out = outs[o];
       if (out == NULL)
