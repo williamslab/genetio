@@ -1768,6 +1768,9 @@ void PersonIO<P>::printImpute2Haps(FILE *out) {
 	int hapAllele = P::_allIndivs[i]->getHapAllele(h, curHapChunk,
 						       curChunkIdx, chromIdx,
 						       chromMarkerIdx);
+	// the first allele is coded 0, second coded 1 (opposite of Eigenstrat
+	// format), so:
+	hapAllele ^= 1;
 	fprintf(out, " %d", hapAllele);
       }
     }
