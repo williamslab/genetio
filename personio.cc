@@ -290,6 +290,7 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
 
   // open with HTSlib:
   hFILE *hfile = hopen(vcfFile, "r");
+
   if (!hfile) {
     for (int o = 0; o < 2; o++) {
       FILE *out = outs[o];
@@ -388,12 +389,8 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
     exit(1);
   }
 
-  if (onlyChr == NULL && numContigs == 1) {
-    // have only one chromosome: set onlyChr accordingly so that we also use
-    // startPos
-    onlyChr = Marker::getMarker(0)->getChromName();
-  }
-  else if (onlyChr == NULL && startPos) {
+  // fprintf(stdout, "%s\n", "1.5 Checkpoint");
+  if (onlyChr == NULL && startPos) {
     // Ignore starting positions if the chromosome to read from isn't defined
     for (int o = 0; o < 2; o++) {
       FILE *out = outs[o];
@@ -431,6 +428,8 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
 
   // Now read in the marker indexes:
   Marker::readVCFFile(vcfIn, index, itr, startPos, endPos);
+  fprintf(stdout, "%s\n", "Read in the markers!");
+
 
   // done iterating
   tbx_itr_destroy(itr);
