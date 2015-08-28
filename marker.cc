@@ -807,6 +807,129 @@ void Marker::updateWindowsMap(int initOffset, float windowLengthMorgans,
   setNumMarkersInWindow(windowStartIdx, curMarkerNum - windowStartIdx);
 }
 
+// TODO : updates the markers genetic distance according to a HapMap-formatted 
+// genetic map.
+// TODO : have it such that we can have multiple chromosomes/ genome-wide 
+
+void Marker::updateGeneticMap(const char *genMapFile){
+  
+  FILE *genMap = fopen(genMapFile, "r");
+
+  // Should have setup a dynarray for each particular chromosome...
+  // We use a large number so that this is not limiting to humans only...
+  // Hashtable<char *, Hashtable<int, float>> chrom2physPosXmapPos = Hashtable<char *, Hashtable<int, float>>(50, stringHash, stringcmp);
+
+  // TODO : think of a better solution than this...
+  dynarray<const char *> chromoArray = dynarray<const char* >(30);
+  dynarray<int> physPosArray = dynarray<int>();
+  dynarray<float> mapPosArray = dynarray<float>();
+
+  // Reading with double buffers...
+  const size_t BUF_SIZE = 2048;
+  char buf1[BUF_SIZE], buf2[BUF_SIZE];
+  char *curBuf, *nextBuf;
+  size_t nread; // number of chars read into <curBuf>
+  size_t bind = 0; // current buffer index in <curBuf> (during parsing below)
+  char *tmpStr = NULL;
+
+  // Needed fields
+  const char *chromName;
+  int physPos;
+  float mapPos;
+
+
+  curBuf = buf1;
+  nextBuf = buf2;
+
+  nread = fread(curBuf, sizeof(char), BUF_SIZE, genMap);
+  bool header = true;
+
+  while(1){
+    // We don't want the header
+    if (header){
+      header = false;
+      continue;
+    }
+
+    int stat;
+
+    // Read in the chromosome
+    stat = readDoubleBuffer(genMap, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
+    if (stat < 0) break;
+    chromName = tmpStr;
+
+    // Read in the physical position
+    stat = readDoubleBuffer(genMap, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
+    if (stat < 0) break;
+    physPos = atoi(tmpStr);
+
+    // Read in the recombination rate
+    stat = readDoubleBuffer(genMap, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
+    if (stat < 0) break;
+
+    // Read in the centimorgan distance
+    stat = readDoubleBuffer(genMap, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
+    if (stat < 0) break;
+    mapPos = atof(tmpStr);
+
+    // Load all into their respective dynarrays/hashtables...
+    chromoArray.append(chromName);
+    physPosArray.append(physPos);
+    mapPosArray.append(mapPos);
+
+  }
+
+  int numMarkers = Marker::getNumMarkers();
+  for (int m = 0; m < numMarkers; m++){
+    Marker *curMarker = Marker::getMarkerNonConst(m);
+
+    // TODO : lookup chromosome and physical location 
+
+    // TODO : search for lower and upper bounds
+
+
+
+    // TODO : interpolate genetic distance if not exact
+
+
+  }
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Sets the last marker number for <prevChromIdx> along with the first and last
 // chunk numbers
 void Marker::updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom) {

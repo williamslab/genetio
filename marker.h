@@ -10,6 +10,8 @@
 #include <htslib/tbx.h>
 #include "hapi-ur-util.h"
 #include "dynarray.h"
+#include "hashtable.h"
+#include "util.h"
 
 #ifndef MARKER_H
 #define MARKER_H
@@ -77,6 +79,10 @@ class Marker {
     static void   updateWindows(int initOffset, int windowNumMarkers);
     static void   updateWindowsMap(int initOffset, float windowLengthMorgans,
 				   int minNumMarkers);
+
+    // TODO : prototype method to read in genetic map
+    static void   updateGeneticMap(const char *genMapFile);
+
 //    static uint32_t getTotalPhysLength(bool analyzeChrX);
 //    static float    getTotalGenetLength(bool analyzeChrX);
     
