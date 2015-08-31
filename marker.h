@@ -80,7 +80,7 @@ class Marker {
     static void   updateWindowsMap(int initOffset, float windowLengthMorgans,
 				   int minNumMarkers);
 
-    // TODO : prototype method to read in genetic map
+    // TODO : prototype method to read in genetic map (hapmap format)
     static void   updateGeneticMap(const char *genMapFile);
 
 //    static uint32_t getTotalPhysLength(bool analyzeChrX);

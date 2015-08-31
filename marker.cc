@@ -837,7 +837,6 @@ void Marker::updateGeneticMap(const char *genMapFile){
   int physPos;
   float mapPos;
 
-
   curBuf = buf1;
   nextBuf = buf2;
 
@@ -884,50 +883,43 @@ void Marker::updateGeneticMap(const char *genMapFile){
     Marker *curMarker = Marker::getMarkerNonConst(m);
 
     // TODO : lookup chromosome and physical location 
+    const char *chrom = curMarker->getChromName();
+    int physPos = curMarker->getPhysPos();
+    // TODO : search for neighboring markers which are mapped
+    // TODO : case when it falls outside of the map...
+    // bool within_map = true;
+    int low_index = 0;
+    int high_index = 0;
+    for (int k = 1; k < chromoArray.length(); k++){
+      if ((strcmp(chromoArray[k], chrom) == 0) && (strcmp(chromoArray[k-1],chrom) == 0)){
+        if (physPosArray[k] > physPos && physPosArray[k-1] < physPos){
+          // within_map = true;
+          high_index = k;
+          low_index = k-1; 
+          break;
+        }
+      }
+    }
 
-    // TODO : search for lower and upper bounds
+    if ((low_index + high_index) == 0) {
+      // mapPosition set to 0 since outside map
+      curMarker->_mapPos = 0.0;
+    }
+    else{
+      float mapPos_low  = mapPosArray[low_index];
+      float mapPos_high = mapPosArray[high_index];
+      int physPos_low   = physPosArray[low_index];
+      int physPos_high  = physPosArray[high_index];
 
+      // Linear Interpolation to detect 
+      float slope  = float(physPos - physPos_low) / float(physPos_high - physPos_low);
+      float mapPos_new = mapPos_low + slope*(mapPos_high - mapPos_low);
 
-
-    // TODO : interpolate genetic distance if not exact
-
-
+      // Now to actually set the genetic position...
+      curMarker->_mapPos = mapPos_new;
+    }
   }
-
-
-
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 // Sets the last marker number for <prevChromIdx> along with the first and last
