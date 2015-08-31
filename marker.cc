@@ -810,7 +810,6 @@ void Marker::updateWindowsMap(int initOffset, float windowLengthMorgans,
 // TODO : updates the markers genetic distance according to a HapMap-formatted 
 // genetic map.
 // TODO : have it such that we can have multiple chromosomes/ genome-wide 
-
 void Marker::updateGeneticMap(const char *genMapFile){
   
   FILE *genMap = fopen(genMapFile, "r");
@@ -871,12 +870,18 @@ void Marker::updateGeneticMap(const char *genMapFile){
     if (stat < 0) break;
     mapPos = atof(tmpStr);
 
+    // TODO : make sure the map is in ascending order...
+
     // Load all into their respective dynarrays/hashtables...
     chromoArray.append(chromName);
     physPosArray.append(physPos);
     mapPosArray.append(mapPos);
 
+    // TODO : end of line check?
+    bind++;
   }
+
+  fprintf(stdout, "Number of points on genetic map: %d\n", chromoArray.length());
 
   int numMarkers = Marker::getNumMarkers();
   for (int m = 0; m < numMarkers; m++){
@@ -886,16 +891,21 @@ void Marker::updateGeneticMap(const char *genMapFile){
     const char *chrom = curMarker->getChromName();
     int physPos = curMarker->getPhysPos();
     // TODO : search for neighboring markers which are mapped
-    // TODO : case when it falls outside of the map...
-    // bool within_map = true;
+    // TODO : case when it falls outside of the map needs optimizing
     int low_index = 0;
     int high_index = 0;
+    bool first = true;
     for (int k = 1; k < chromoArray.length(); k++){
       if ((strcmp(chromoArray[k], chrom) == 0) && (strcmp(chromoArray[k-1],chrom) == 0)){
-        if (physPosArray[k] > physPos && physPosArray[k-1] < physPos){
-          // within_map = true;
+        // fprintf(stdout, "Marker Phys Pos : %d\t Map Phys Pos : %d\n", 
+          // physPos, physPosArray[k]);
+        if (first){
+          first = false;
+          if (physPos < physPosArray[k]) break;
+        }
+        if ((physPosArray[k] > physPos) && physPosArray[k-1] < physPos){
           high_index = k;
-          low_index = k-1; 
+          low_index = k-1;
           break;
         }
       }
