@@ -428,8 +428,6 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
 
   // Now read in the marker indexes:
   Marker::readVCFFile(vcfIn, index, itr, startPos, endPos);
-  fprintf(stdout, "%s\n", "Read in the markers!");
-
 
   // done iterating
   tbx_itr_destroy(itr);
