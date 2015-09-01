@@ -818,8 +818,8 @@ void Marker::updateGeneticMap(const char *genMapFile){
   // We use a large number so that this is not limiting to humans only...
   // Hashtable<char *, Hashtable<int, float>> chrom2physPosXmapPos = Hashtable<char *, Hashtable<int, float>>(50, stringHash, stringcmp);
 
-  // TODO : think of a better solution than this...
-  dynarray<const char *> chromoArray = dynarray<const char* >(30);
+  // TODO : think of a better datastructure usage than this...
+  dynarray<const char *> chromoArray = dynarray<const char* >(60000);
   dynarray<int> physPosArray = dynarray<int>();
   dynarray<float> mapPosArray = dynarray<float>();
 
@@ -870,7 +870,17 @@ void Marker::updateGeneticMap(const char *genMapFile){
     if (stat < 0) break;
     mapPos = atof(tmpStr);
 
-    // TODO : make sure the map is in ascending order...
+    // Make sure the map is in ascending order...
+    if (chromoArray.length() > 0){
+      // We have the same chromosome
+     if (strcmp(chromoArray[chromoArray.length()-1], chromName) == 0){
+      if (physPos < physPosArray[physPosArray.length()-1] || 
+        mapPos < mapPosArray[mapPosArray.length()-1]){
+        fprintf(stderr, "ERROR : genetic map not in ascending order!\n");
+        exit(1);
+      }   
+     } 
+    }
 
     // Load all into their respective dynarrays/hashtables...
     chromoArray.append(chromName);
@@ -881,29 +891,24 @@ void Marker::updateGeneticMap(const char *genMapFile){
     bind++;
   }
 
-  fprintf(stdout, "Number of points on genetic map: %d\n", chromoArray.length());
-
   int numMarkers = Marker::getNumMarkers();
   for (int m = 0; m < numMarkers; m++){
     Marker *curMarker = Marker::getMarkerNonConst(m);
 
-    // TODO : lookup chromosome and physical location 
     const char *chrom = curMarker->getChromName();
     int physPos = curMarker->getPhysPos();
-    // TODO : search for neighboring markers which are mapped
     // TODO : case when it falls outside of the map needs optimizing
     int low_index = 0;
     int high_index = 0;
     bool first = true;
     for (int k = 1; k < chromoArray.length(); k++){
       if ((strcmp(chromoArray[k], chrom) == 0) && (strcmp(chromoArray[k-1],chrom) == 0)){
-        // fprintf(stdout, "Marker Phys Pos : %d\t Map Phys Pos : %d\n", 
-          // physPos, physPosArray[k]);
         if (first){
           first = false;
-          if (physPos < physPosArray[k]) break;
+          if (physPos < physPosArray[k])break;
         }
-        if ((physPosArray[k] > physPos) && physPosArray[k-1] < physPos){
+        else if (physPosArray[k] >= physPos){
+          // Will end on the first marker that is greater than it
           high_index = k;
           low_index = k-1;
           break;
@@ -911,8 +916,8 @@ void Marker::updateGeneticMap(const char *genMapFile){
       }
     }
 
-    if ((low_index + high_index) == 0) {
-      // mapPosition set to 0 since outside map
+    // Not contained within the map -> 0
+    if ((low_index == 0) &&  (high_index == 0)) {
       curMarker->_mapPos = 0.0;
     }
     else{
@@ -929,6 +934,7 @@ void Marker::updateGeneticMap(const char *genMapFile){
       curMarker->_mapPos = mapPos_new;
     }
   }
+
 }
 
 
