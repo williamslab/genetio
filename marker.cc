@@ -807,21 +807,29 @@ void Marker::updateWindowsMap(int initOffset, float windowLengthMorgans,
   setNumMarkersInWindow(windowStartIdx, curMarkerNum - windowStartIdx);
 }
 
-// TODO : updates the markers genetic distance according to a HapMap-formatted 
-// genetic map.
+// Searches through a sorted list of physical positions
+int bin_search(dynarray<int> array, int key){
+	int i = 0;
+	int e = array.length() - 1;
+	if (key < array[i] || key > array[e]) return -1;
+	while(true){
+		int pvt = e - (e-i)/2;
+		if (e-i <= 1) break;
+		if (array[pvt] == key) return pvt;
+		key > array[pvt] ? i = pvt : e = pvt;
+	}
+	return e;
+}
+
 // TODO : have it such that we can have multiple chromosomes/ genome-wide 
 void Marker::updateGeneticMap(const char *genMapFile){
   
   FILE *genMap = fopen(genMapFile, "r");
 
-  // Should have setup a dynarray for each particular chromosome...
-  // We use a large number so that this is not limiting to humans only...
-  // Hashtable<char *, Hashtable<int, float>> chrom2physPosXmapPos = Hashtable<char *, Hashtable<int, float>>(50, stringHash, stringcmp);
-
-  // TODO : think of a better datastructure usage than this...
-  dynarray<const char *> chromoArray = dynarray<const char* >(60000);
-  dynarray<int> physPosArray = dynarray<int>();
-  dynarray<float> mapPosArray = dynarray<float>();
+  // TODO : possibly dynarray of dynarrays would be best here.
+  dynarray<const char *> chromoArray = dynarray<const char* >(64);
+  dynarray<int> physPosArray = dynarray<int>(10000);
+  dynarray<float> mapPosArray = dynarray<float>(10000);
 
   // Reading with double buffers...
   const size_t BUF_SIZE = 2048;
@@ -849,6 +857,7 @@ void Marker::updateGeneticMap(const char *genMapFile){
       continue;
     }
 
+    // Line reading status
     int stat;
 
     // Read in the chromosome
@@ -898,26 +907,30 @@ void Marker::updateGeneticMap(const char *genMapFile){
     const char *chrom = curMarker->getChromName();
     int physPos = curMarker->getPhysPos();
     // TODO : case when it falls outside of the map needs optimizing
-    int low_index = 0;
-    int high_index = 0;
-    bool first = true;
-    for (int k = 1; k < chromoArray.length(); k++){
-      if ((strcmp(chromoArray[k], chrom) == 0) && (strcmp(chromoArray[k-1],chrom) == 0)){
-        if (first){
-          first = false;
-          if (physPos < physPosArray[k])break;
-        }
-        else if (physPosArray[k] >= physPos){
-          // Will end on the first marker that is greater than it
-          high_index = k;
-          low_index = k-1;
-          break;
-        }
-      }
-    }
+    int low_index = -1;
+    int high_index = -1;
+    // bool first = true;
+    // for (int k = 1; k < chromoArray.length(); k++){
+    //   if ((strcmp(chromoArray[k], chrom) == 0) && (strcmp(chromoArray[k-1],chrom) == 0)){
+    //     if (first){
+    //       first = false;
+    //       if (physPos < physPosArray[k])break;
+    //     }
+    //     else if (physPosArray[k] >= physPos){
+    //       // Will end on the first marker that is greater than it
+    //       high_index = k;
+    //       low_index = k-1;
+    //       break;
+    //     }
+    //   }
+    // }
+
+    high_index = bin_search(physPosArray, physPos);
+    high_index >= 0 ? low_index = high_index-1 : low_index = -1;
 
     // Not contained within the map -> 0
-    if ((low_index == 0) &&  (high_index == 0)) {
+    if ((low_index == -1) &&  (high_index == -1)) {
+    	fprintf(stdout, "Not Within the Map!\n");
       curMarker->_mapPos = 0.0;
     }
     else{

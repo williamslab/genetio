@@ -10,7 +10,6 @@
 #include <htslib/tbx.h>
 #include "hapi-ur-util.h"
 #include "dynarray.h"
-#include "hashtable.h"
 #include "util.h"
 
 #ifndef MARKER_H
