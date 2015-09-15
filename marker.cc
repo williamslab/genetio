@@ -813,7 +813,8 @@ int bin_search(dynarray<int> array, int key){
 	int e = array.length() - 1;
 	if (key < array[i] || key > array[e]) return -1;
 	while(true){
-		int pvt = e - (e-i)/2;
+		// fprintf(stdout, "i = %d, e = %d\n", i , e);
+    int pvt = e - (e-i)/2;
 		if (e-i <= 1) break;
 		if (array[pvt] == key) return pvt;
 		key > array[pvt] ? i = pvt : e = pvt;
@@ -826,10 +827,15 @@ void Marker::updateGeneticMap(const char *genMapFile){
   
   FILE *genMap = fopen(genMapFile, "r");
 
+  // dynarray<const char *> chromoArray = dynarray<const char*>(64);
+  // dynarray<int> physPosArray = dynarray<int>(10000);
+  // dynarray<float> mapPosArray = dynarray<float>(10000);
+
+
   // TODO : possibly dynarray of dynarrays would be best here.
-  dynarray<const char *> chromoArray = dynarray<const char* >(64);
-  dynarray<int> physPosArray = dynarray<int>(10000);
-  dynarray<float> mapPosArray = dynarray<float>(10000);
+  dynarray<const char*> chromoArray2 = dynarray<const char*>(64);
+  dynarray<dynarray<int>> chromo2PhysPos = dynarray<dynarray<int>>();
+  dynarray<dynarray<float>> chromo2MapPos = dynarray<dynarray<float>>();
 
   // Reading with double buffers...
   const size_t BUF_SIZE = 2048;
@@ -879,26 +885,52 @@ void Marker::updateGeneticMap(const char *genMapFile){
     if (stat < 0) break;
     mapPos = atof(tmpStr);
 
-    // Make sure the map is in ascending order...
-    if (chromoArray.length() > 0){
-      // We have the same chromosome
-     if (strcmp(chromoArray[chromoArray.length()-1], chromName) == 0){
-      if (physPos < physPosArray[physPosArray.length()-1] || 
-        mapPos < mapPosArray[mapPosArray.length()-1]){
-        fprintf(stderr, "ERROR : genetic map not in ascending order!\n");
-        exit(1);
-      }   
-     } 
+    // // Load all into their respective dynarrays/hashtables...
+    // chromoArray.append(chromName);
+    // physPosArray.append(physPos);
+    // mapPosArray.append(mapPos);
+
+    int i = 0;
+    bool found = false;
+    while (i < chromoArray2.length()){
+      // Compare chromosome names to find index of first occurence
+      if (strcmp(chromoArray2[i], chromName) == 0){
+        found = true;
+        break;
+      }
+      // fprintf(stdout, "ChromName at i : %s \t CHROM : %s\n", chromoArray2[i], chromName);
+      i++;
     }
 
-    // Load all into their respective dynarrays/hashtables...
-    chromoArray.append(chromName);
-    physPosArray.append(physPos);
-    mapPosArray.append(mapPos);
+    if (!found){
+      // Setting up a new chromosome...
+      fprintf(stdout, "ChromName Inserted : %s\n", chromName);
+      chromoArray2.append(chromName);
+      dynarray<int> tempChromoPhysPos = dynarray<int>(1024);
+      tempChromoPhysPos.append(physPos);
+      dynarray<float> tempChromoMapPos = dynarray<float>(1024);
+      tempChromoMapPos.append(mapPos);
+      chromo2PhysPos.append(tempChromoPhysPos);
+      chromo2MapPos.append(tempChromoMapPos);
+    } 
+    else {
+      dynarray<int> curChromoPhysPos  = chromo2PhysPos[i];
+      dynarray<float> curChromoMapPos = chromo2MapPos[i];
+      // Checking to make sure the order is correct. 
+      if (physPos < curChromoPhysPos[curChromoPhysPos.length()-1] || 
+        mapPos < curChromoMapPos[curChromoMapPos.length()-1]){
+          fprintf(stderr, "ERROR : genetic map not in ascending order!\n");
+          exit(1);
+      }
+      curChromoPhysPos.append(physPos);
+      curChromoMapPos.append(mapPos);
+    }
 
     // TODO : end of line check?
     bind++;
   }
+
+  fprintf(stdout, "READ IN GENETIC MAP!\n");
 
   int numMarkers = Marker::getNumMarkers();
   for (int m = 0; m < numMarkers; m++){
@@ -906,38 +938,39 @@ void Marker::updateGeneticMap(const char *genMapFile){
 
     const char *chrom = curMarker->getChromName();
     int physPos = curMarker->getPhysPos();
-    // TODO : case when it falls outside of the map needs optimizing
     int low_index = -1;
     int high_index = -1;
-    // bool first = true;
-    // for (int k = 1; k < chromoArray.length(); k++){
-    //   if ((strcmp(chromoArray[k], chrom) == 0) && (strcmp(chromoArray[k-1],chrom) == 0)){
-    //     if (first){
-    //       first = false;
-    //       if (physPos < physPosArray[k])break;
-    //     }
-    //     else if (physPosArray[k] >= physPos){
-    //       // Will end on the first marker that is greater than it
-    //       high_index = k;
-    //       low_index = k-1;
-    //       break;
-    //     }
-    //   }
-    // }
 
-    high_index = bin_search(physPosArray, physPos);
+    int chromIdx = 0;
+    bool found = false; 
+    while(chromIdx < chromoArray2.length()){
+      if (strcmp(chromoArray2[chromIdx], chrom) == 0){
+        found = true;
+        break;
+      }
+      // fprintf(stdout, "Chromosome : %s\t Marker: %s\n", chromoArray2[chromIdx], chrom);
+      chromIdx++;
+    }
+
+    if (!found){
+      fprintf(stderr, "ERROR : Chromosome code %s not in map!\n", chrom);
+      exit(1);
+    }
+    
+    high_index = bin_search(chromo2PhysPos[chromIdx], physPos);
     high_index >= 0 ? low_index = high_index-1 : low_index = -1;
-
+    
+    // fprintf(stdout, "High : %d\t Low : %d\n", high_index, low_index);
     // Not contained within the map -> 0
     if ((low_index == -1) &&  (high_index == -1)) {
-    	fprintf(stdout, "Not Within the Map!\n");
+    	// fprintf(stdout, "Not Within the Map!\n");
       curMarker->_mapPos = 0.0;
     }
     else{
-      float mapPos_low  = mapPosArray[low_index];
-      float mapPos_high = mapPosArray[high_index];
-      int physPos_low   = physPosArray[low_index];
-      int physPos_high  = physPosArray[high_index];
+      float mapPos_low  = chromo2MapPos[chromIdx][low_index];
+      float mapPos_high = chromo2MapPos[chromIdx][high_index];
+      int physPos_low   = chromo2PhysPos[chromIdx][low_index];
+      int physPos_high  = chromo2PhysPos[chromIdx][high_index];
 
       // Linear Interpolation to detect 
       float slope  = float(physPos - physPos_low) / float(physPos_high - physPos_low);
