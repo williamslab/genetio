@@ -41,10 +41,10 @@ inline int max(int a, int b) {
 
 inline double sumLogLikelihood(double a, double b) {
   if (a > b) {
-    return a + log(1 + exp(b - a));
+    return a + log1p(exp(b - a));
   }
   else {
-    return b + log(1 + exp(a - b));
+    return b + log1p(exp(a - b));
   }
 }
 
