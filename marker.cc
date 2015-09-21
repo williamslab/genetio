@@ -895,16 +895,15 @@ void Marker::updateGeneticMap(const char *genMapFile){
     while (i < chromoArray2.length()){
       // Compare chromosome names to find index of first occurence
       if (strcmp(chromoArray2[i], chromName) == 0){
+        // fprintf(stdout, "ChromName Found : %s\t i : %d, ChromName : %s\n", chromoArray2[i], i, chromName);
         found = true;
         break;
       }
-      // fprintf(stdout, "ChromName at i : %s \t CHROM : %s\n", chromoArray2[i], chromName);
       i++;
     }
 
     if (!found){
       // Setting up a new chromosome...
-      fprintf(stdout, "ChromName Inserted : %s\n", chromName);
       chromoArray2.append(chromName);
       dynarray<int> tempChromoPhysPos = dynarray<int>(1024);
       tempChromoPhysPos.append(physPos);
