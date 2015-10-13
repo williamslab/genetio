@@ -522,6 +522,7 @@ void PersonBits::printTrioEigenstratPhased(FILE *out) {
 void PersonBits::initRandSampledHaps() {
   int numSamples = _allIndivs.length();
   int numHapChunks = Marker::getNumHapChunks();
+  std::uniform_int_distribution<int> randGeno(0,1); // uniform random genotype
   for(int id = 0; id < numSamples; id++) {
     PersonBits *thePerson = _allIndivs[id];
 
@@ -564,14 +565,14 @@ void PersonBits::initRandSampledHaps() {
 	  int isKnown = (knownSites >> curChunkIdx) & 1;
 	  int isMiss = (missingSites >> curChunkIdx) & 1;
 
-	  int randGeno = rand() / (RAND_MAX / 2 + 1); // +1 so result < 2
+	  int randGenoVal = randGeno(RandGen::v);
 	  // only randomize if the haplotype value is not known and the
 	  // genotype is not missing:
 	  //
 	  // Note: we won't bother randomizing missing data sites since the
 	  // first window size has only 4 markers, so we will seed all possible
 	  // values for missing data sites (since 4 < MAX_NUM_MISSING_FULL_SEED)
-	  chunk genoVal = (1 - isKnown) & (1 - isMiss) & randGeno;
+	  chunk genoVal = (1 - isKnown) & (1 - isMiss) & randGenoVal;
 
 	  thePerson->_sampledHaplotypes[curHapChunk][s*2+0]
 						    |= (genoVal << curChunkIdx);
@@ -607,8 +608,9 @@ void PersonBits::initRandSampledHaps() {
 	      int isKnown = (knownSites >> curChunkIdx) & 1;
 	      int isMiss = (missingSites >> curChunkIdx) & 1;
 
-	      int randGeno = rand() / (RAND_MAX / 2 + 1); // +1 so result < 2
-	      chunk genoVal = (1 - isKnown) & (1 - isMiss) & randGeno;
+	      // TODO: may be slow to do this; probably should branch on missing
+	      int randGenoVal = randGeno(RandGen::v);
+	      chunk genoVal = (1 - isKnown) & (1 - isMiss) & randGenoVal;
 
 	      otherPerson->_sampledHaplotypes[curHapChunk][s*2+0]
 						    |= (genoVal << curChunkIdx);
