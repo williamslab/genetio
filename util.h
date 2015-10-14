@@ -5,6 +5,8 @@
 
 #include <limits.h>
 #include <math.h>
+#include <sys/time.h>
+#include <random>
 
 #ifndef UTIL_H
 #define UTIL_H
@@ -99,5 +101,13 @@ inline void swap(int &v1, int &v2) {
   v1 = v2;
   v2 = tmp;
 }
+
+struct RandGen {
+  static void seed(bool autoSrand, std::mt19937::result_type &randSeed);
+  static double real01() { return dis01(v); }
+
+  static std::mt19937 v; // variable to generate random numbers
+  static std::uniform_real_distribution<> dis01;
+};
 
 #endif // UTIL_H
