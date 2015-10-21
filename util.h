@@ -5,6 +5,8 @@
 
 #include <limits.h>
 #include <math.h>
+#include <sys/time.h>
+#include <random>
 
 #ifndef UTIL_H
 #define UTIL_H
@@ -41,10 +43,10 @@ inline int max(int a, int b) {
 
 inline double sumLogLikelihood(double a, double b) {
   if (a > b) {
-    return a + log(1 + exp(b - a));
+    return a + log1p(exp(b - a));
   }
   else {
-    return b + log(1 + exp(a - b));
+    return b + log1p(exp(a - b));
   }
 }
 
@@ -99,5 +101,13 @@ inline void swap(int &v1, int &v2) {
   v1 = v2;
   v2 = tmp;
 }
+
+struct RandGen {
+  static void seed(bool autoSrand, std::mt19937::result_type &randSeed);
+  static double real01() { return dis01(v); }
+
+  static std::mt19937 v; // variable to generate random numbers
+  static std::uniform_real_distribution<> dis01;
+};
 
 #endif // UTIL_H
