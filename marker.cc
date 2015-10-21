@@ -826,7 +826,6 @@ void Marker::updateGeneticMap(const char *genMapFile){
   
   FILE *genMap = fopen(genMapFile, "r");
 
-  // TODO : possibly dynarray of dynarrays would be best here.
   dynarray<const char *> chromoArray = dynarray<const char* >(64);
   dynarray<int> physPosArray = dynarray<int>(10000);
   dynarray<float> mapPosArray = dynarray<float>(10000);
@@ -896,7 +895,6 @@ void Marker::updateGeneticMap(const char *genMapFile){
     physPosArray.append(physPos);
     mapPosArray.append(mapPos);
 
-    // TODO : end of line check?
     bind++;
   }
 
@@ -904,33 +902,16 @@ void Marker::updateGeneticMap(const char *genMapFile){
   for (int m = 0; m < numMarkers; m++){
     Marker *curMarker = Marker::getMarkerNonConst(m);
 
-    const char *chrom = curMarker->getChromName();
     int physPos = curMarker->getPhysPos();
     // TODO : case when it falls outside of the map needs optimizing
     int low_index = -1;
     int high_index = -1;
-    // bool first = true;
-    // for (int k = 1; k < chromoArray.length(); k++){
-    //   if ((strcmp(chromoArray[k], chrom) == 0) && (strcmp(chromoArray[k-1],chrom) == 0)){
-    //     if (first){
-    //       first = false;
-    //       if (physPos < physPosArray[k])break;
-    //     }
-    //     else if (physPosArray[k] >= physPos){
-    //       // Will end on the first marker that is greater than it
-    //       high_index = k;
-    //       low_index = k-1;
-    //       break;
-    //     }
-    //   }
-    // }
 
     high_index = bin_search(physPosArray, physPos);
     high_index >= 0 ? low_index = high_index-1 : low_index = -1;
 
     // Not contained within the map -> 0
     if ((low_index == -1) &&  (high_index == -1)) {
-    	fprintf(stdout, "Not Within the Map!\n");
       curMarker->_mapPos = 0.0;
     }
     else{
