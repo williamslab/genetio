@@ -7,6 +7,8 @@
 #include <string.h>
 #include <math.h>
 #include "marker.h"
+#include "hashtable.h"
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
@@ -821,12 +823,49 @@ int bin_search(dynarray<int> array, int key){
 	return e;
 }
 
+// Searches through sorted list as well
+int loop_search(dynarray<std::string> chromoArray, dynarray<int> array, std::string chromo, int key){
+  int index = 0;
+  if (chromoArray.length() != array.length()){
+		fprintf(stderr,
+		  "ERROR: Incorrect Array lengths between chromosomes and positions!\n");
+	  exit(1);
+	}
+
+	// TODO : hashtables of breakpoints
+	int k = 0;
+	while(chromo.compare(chromoArray[k]) != 0) k++;
+	
+	int start = k;
+
+	// TODO : There is an error when the marker is above the genetic map
+	bool found = false;
+	while ((chromo.compare(chromoArray[k]) == 0) && (k < chromoArray.length())) {
+		index = k;
+		// How to check if first?
+		if (array[k] >= key && index == start) break;
+		else if (array[k] >= key){
+			found = true;
+			break;
+		}
+		k++;
+		// fprintf(stdout, "K : %d\n", k);
+	}
+
+  if (!found){
+  	index = -1;
+  }
+
+  fprintf(stdout, "Chromosome : %s, Position : %d\n", chromo.c_str(), key);
+  return index;
+}
+
 // TODO : have it such that we can have multiple chromosomes/ genome-wide 
 void Marker::updateGeneticMap(const char *genMapFile){
   
   FILE *genMap = fopen(genMapFile, "r");
 
-  dynarray<const char *> chromoArray = dynarray<const char* >(64);
+  dynarray<std::string> chromoArray = dynarray<std::string>(10000);
   dynarray<int> physPosArray = dynarray<int>(10000);
   dynarray<float> mapPosArray = dynarray<float>(10000);
 
@@ -839,7 +878,7 @@ void Marker::updateGeneticMap(const char *genMapFile){
   char *tmpStr = NULL;
 
   // Needed fields
-  const char *chromName;
+  std::string chromName;
   int physPos;
   float mapPos;
 
@@ -850,11 +889,6 @@ void Marker::updateGeneticMap(const char *genMapFile){
   bool header = true;
 
   while(1){
-    // We don't want the header
-    if (header){
-      header = false;
-      continue;
-    }
 
     // Line reading status
     int stat;
@@ -878,10 +912,10 @@ void Marker::updateGeneticMap(const char *genMapFile){
     if (stat < 0) break;
     mapPos = atof(tmpStr);
 
-    // Make sure the map is in ascending order...
+    // // Make sure the map is in ascending order...
     if (chromoArray.length() > 0){
       // We have the same chromosome
-     if (strcmp(chromoArray[chromoArray.length()-1], chromName) == 0){
+     if (chromName.compare(chromoArray[chromoArray.length()-1]) == 0){
       if (physPos < physPosArray[physPosArray.length()-1] || 
         mapPos < mapPosArray[mapPosArray.length()-1]){
         fprintf(stderr, "ERROR : genetic map not in ascending order!\n");
@@ -890,15 +924,27 @@ void Marker::updateGeneticMap(const char *genMapFile){
      } 
     }
 
-    // Load all into their respective dynarrays/hashtables...
-    chromoArray.append(chromName);
-    physPosArray.append(physPos);
-    mapPosArray.append(mapPos);
+    if (!header){
+	    // Load all into their respective dynarrays/hashtables...
+	    chromoArray.append(chromName);
+	    physPosArray.append(physPos);
+	    mapPosArray.append(mapPos);
+  	}
 
+  	// Now past the header
+    if (header){
+      header = false;
+    }
     bind++;
   }
 
+
+  // fprintf(stdout, "Length of ChromoArray : %d\n", chromoArray.length() );
+
+
+
   int numMarkers = Marker::getNumMarkers();
+
   for (int m = 0; m < numMarkers; m++){
     Marker *curMarker = Marker::getMarkerNonConst(m);
 
@@ -907,18 +953,22 @@ void Marker::updateGeneticMap(const char *genMapFile){
     int low_index = -1;
     int high_index = -1;
 
-    high_index = bin_search(physPosArray, physPos);
+    high_index = loop_search(chromoArray, physPosArray, curMarker->getChromName(), physPos);
     high_index >= 0 ? low_index = high_index-1 : low_index = -1;
 
     // Not contained within the map -> 0
     if ((low_index == -1) &&  (high_index == -1)) {
+    	fprintf(stdout, "Bad Case!!\n");
       curMarker->_mapPos = 0.0;
     }
     else{
+    	fprintf(stdout, "High Index : %d, Low Index : %d!\n", high_index, low_index);
       float mapPos_low  = mapPosArray[low_index];
       float mapPos_high = mapPosArray[high_index];
       int physPos_low   = physPosArray[low_index];
       int physPos_high  = physPosArray[high_index];
+
+      fprintf(stdout, "Past Accessing Arrays!\n");
 
       // Linear Interpolation to detect 
       float slope  = float(physPos - physPos_low) / float(physPos_high - physPos_low);
