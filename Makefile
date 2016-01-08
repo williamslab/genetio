@@ -9,14 +9,19 @@ GPP = g++
 GCC = gcc
 AR  = ar
 DEFINES= 
-#CFLAGS = -g -Wall $(DEFINES)
-# optimized; remove asserts
-#CFLAGS = -O2 -Wall -DNDEBUG $(DEFINES)
-CFLAGS = -O2 -Wall $(DEFINES)
-# profiling:
-#CFLAGS = -pg -O2 -Wall $(DEFINES)
+CFLAGS = -Wall $(DEFINES)
+ifdef DEBUG           # to use run `make DEBUG=1`
+  CFLAGS += -g
+else
+  CFLAGS += -O2
+endif
 
-CPPFLAGS = -std=c++11 $(CFLAGS)
+# profiling:
+ifdef PROFILE       # to use run `make PROFILE=1
+  CFLAGS += -pg
+endif
+
+CPPFLAGS = -std=c++0x $(CFLAGS)
 
 # dependency variables / commands
 DEPDIR = .deps
