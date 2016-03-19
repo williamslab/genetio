@@ -1,4 +1,4 @@
-CPPSRCS= marker.cc util.cc hapi-ur-util.cc personio.cc personbits.cc superperson.cc personnorm.cc
+CPPSRCS= marker.cc util.cc hapi-ur-util.cc personio.cc personbits.cc superperson.cc personnorm.cc personhapbits.cc
 CSRCS= 
 OBJS= $(patsubst %.cc,%.o,$(CPPSRCS)) $(patsubst %.c,%.o,$(CSRCS))
 LIB= libgenetio.a
@@ -9,12 +9,20 @@ GPP = g++
 GCC = gcc
 AR  = ar
 DEFINES= 
-#CFLAGS = -g -Wall $(DEFINES)
-# optimized; remove asserts
-#CFLAGS = -O2 -Wall -DNDEBUG $(DEFINES)
-CFLAGS = -O2 -Wall $(DEFINES)
-# profiling:
-#CFLAGS = -pg -O2 -Wall $(DEFINES)
+CFLAGS = -Wall
+
+ifeq ($(DEBUG), 1)
+  CFLAGS += -g $(DEFINES)
+else
+  CFLAGS += -O2 $(DEFINES)
+endif
+
+# profiling: compile with `make PROFILE=1`, run program normally, then do:
+#   `gprof -b -z hapi gmon.out`
+ifeq ($(PROFILE), 1)
+  CFLAGS += -pg
+endif
+
 
 CPPFLAGS = -std=c++11 $(CFLAGS)
 
