@@ -9,22 +9,19 @@ GPP = g++
 GCC = gcc
 AR  = ar
 DEFINES= 
-CFLAGS = -Wall
-
-ifeq ($(DEBUG), 1)
-  CFLAGS += -g $(DEFINES)
+CFLAGS = -Wall $(DEFINES)
+ifdef DEBUG           # to use run `make DEBUG=1`
+  CFLAGS += -g
 else
-  CFLAGS += -O2 $(DEFINES)
+  CFLAGS += -O2
 endif
 
-# profiling: compile with `make PROFILE=1`, run program normally, then do:
-#   `gprof -b -z hapi gmon.out`
-ifeq ($(PROFILE), 1)
+# profiling:
+ifdef PROFILE       # to use run `make PROFILE=1
   CFLAGS += -pg
 endif
 
-
-CPPFLAGS = -std=c++11 $(CFLAGS)
+CPPFLAGS = -std=c++0x $(CFLAGS)
 
 # dependency variables / commands
 DEPDIR = .deps
