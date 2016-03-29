@@ -14,6 +14,7 @@
 #include "personio.h"
 #include "personbits.h"
 #include "personnorm.h"
+#include "personhapbits.h"
 #include "marker.h"
 #include "util.h"
 
@@ -42,8 +43,8 @@ template <class P>
 void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, const char *onlyChr,
 			   int startPos, int endPos, const char *XchrName,
-			   int noFamilyId, bool vcfInput,
-			   int printTrioKids, FILE *log, int **numMendelError,
+			   int noFamilyId, bool vcfInput, int printTrioKids,
+			   FILE *log, bool phased, int **numMendelError,
 			   int **numMendelCounted) {
   if (vcfInput) {
     readVCF(genoFile, onlyChr, startPos, endPos, XchrName, log);
@@ -77,6 +78,16 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
     fileType = 1; // packed ancestry map
   else if (c == 108)
     fileType = 2; // PLINK BED
+
+  if (phased && fileType != 0) {
+    for (int o = 0; o < 2; o++) {
+      FILE *out = outs[o];
+      if (out == NULL)
+	continue;
+      fprintf(out, "\n\nERROR: Request to read phased data in file format that is unphased\n");
+      exit(2);
+    }
+  }
 
   ///////////////////////////////////////////////////////////////////////
   // Parse SNP file:
@@ -135,7 +146,7 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
   }
 
   if (fileType == 0 || fileType == 1) {
-    readIndivs(indivIn);
+    readIndivs(indivIn, log, phased);
   }
   else {
     assert(fileType == 2);
@@ -176,7 +187,7 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
   fflush(stdout);
 
   if (fileType == 0) {
-    parseEigenstratFormat(genoIn);
+    parseEigenstratFormat(genoIn, phased);
   }
   else if (fileType == 1) {
     parsePackedAncestryMapFormat(genoIn);
@@ -204,7 +215,7 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 	int numHets, numCalls;
 	// TODO: want to call this regardless of whether we're analyzing X alone
 	// or if it is read with everything else
-	cur->setXHetToMissing(&numHets, &numCalls);
+	cur->setXHetToMissing(log, &numHets, &numCalls);
 	if (numHets > 0) {
 	  for (int o = 0; o < 2; o++) {
 	    FILE *out = outs[o];
@@ -478,11 +489,45 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
 // Reads the individual file <filename> and stores the resulting individual
 // records in <P::_allIndivs>.
 template <class P>
-void PersonIO<P>::readIndivs(FILE *in) {
+void PersonIO<P>::readIndivs(FILE *in, FILE *log, bool phased) {
   char id[81], pop[81];
   char sex;
+  int line = 0;
+  FILE *outs[2] = { stdout, log };
+  P *prevPerson = NULL;
 
   while (fscanf(in, "%80s %c %80s", id, &sex, pop) == 3) {
+    line++;
+
+    if (phased) {
+      // Ensure id ends with either _A/_B or :A/:B
+      int idLen = strlen(id);
+      char lastChar = (line % 2 == 1) ? 'A' : 'B';
+      bool badLine = id[ idLen - 1 ] != lastChar ||
+		     (id[ idLen - 2 ] != '_' && id[ idLen - 2 ] != ':');
+      id[ idLen - 2 ] = '\0';
+      if (line % 2 == 0) {
+	assert(prevPerson != NULL);
+	badLine = badLine || strcmp(id, prevPerson->getId()) != 0;
+      }
+
+      if (badLine) {
+	for(int o = 0; o < 2; o++) {
+	  FILE *out = outs[o];
+	  if (out == NULL)
+	    continue;
+	  fprintf(out, "\n\nERROR: Phased Eigenstrat individual file: ");
+	  fprintf(out, "expected alternating ids\n");
+	  fprintf(out, "       ending in _A and _B\n");
+	}
+	exit(5);
+      }
+
+      if (line % 2 == 0) {
+	continue; // already read in this person: next line
+      }
+    }
+
     // find pop index for the string <pop>
     int popIndex;
     if (strcmp(pop, "Ignore") == 0)
@@ -503,7 +548,9 @@ void PersonIO<P>::readIndivs(FILE *in) {
     }
     P *p = new P(id, sex, popIndex);
 
+
     P::_allIndivs.append(p);
+    prevPerson = p;
   }
 }
 
@@ -1078,19 +1125,21 @@ void PersonIO<P>::parsePackedGenotypes(FILE *in, int recordLen, char *buf,
 
 // Parses a genotype file in Eigenstrat format
 template <class P>
-void PersonIO<P>::parseEigenstratFormat(FILE *in) {
+void PersonIO<P>::parseEigenstratFormat(FILE *in, bool phased) {
   int c, ret;
 
   int numSamples = P::_allIndivs.length();
-  char *buf = new char[numSamples+1];
+
+  int bufSize = phased ? numSamples*2 : numSamples;
+  char *buf = new char[bufSize + 1]; // +1 for end of line character
 
   // read in but don't store genotypes for markers that should be skipped
   // because we're only analyzing one chromosome:
   for(int i = 0; i < Marker::getFirstStoredMarkerFileIdx(); i++) {
-    // read in one line which will consist of <numSamples> genotypes plus a
+    // read in one line which will consist of <bufSize> genotypes plus a
     // '\n' character:
-    ret = fread(buf, numSamples+1, sizeof(char), in);
-    assert(buf[numSamples] == '\n'); // should have endline here
+    ret = fread(buf, bufSize+1, sizeof(char), in);
+    assert(buf[bufSize] == '\n'); // should have endline here
     if (ret == 0) {
       fprintf(stderr, "\nERROR reading from geno file\n");
       exit(1);
@@ -1122,8 +1171,8 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in) {
   int nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
 
   for( ; curMarkerIdx < numMarkersToRead; curMarkerIdx++) {
-    ret = fread(buf, numSamples+1, sizeof(char), in);
-    assert(buf[numSamples] == '\n'); // should have endline here
+    ret = fread(buf, bufSize+1, sizeof(char), in);
+    assert(buf[bufSize] == '\n'); // should have endline here
     if (ret == 0) {
       fprintf(stderr, "\nERROR reading from geno file\n");
       exit(1);
@@ -1158,29 +1207,50 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in) {
     }
 
     for(int curPersonIdx = 0; curPersonIdx < numSamples; curPersonIdx++) {
-      c = buf[curPersonIdx];
-
-      // the genotype
-      if (c != '0' && c != '1' && c != '2' && c != '9') {
-      	fprintf(stderr, "\nERROR: bad character in genotype file: %c\n", c);
-      	exit(1);
-      }
-      
       int geno[2];
-      switch (c) {
-      	case '0':
-      	  geno[0] = geno[1] = 0;
-      	  break;
-      	case '1':
-      	  geno[0] = 0;
-      	  geno[1] = 1;
-      	  break;
-      	case '2':
-      	  geno[0] = geno[1] = 1;
-      	  break;
-      	case '9': // missing data
-      	  geno[0] = geno[1] = -1;
-      	  break;
+
+      if (!phased) {
+	c = buf[curPersonIdx];
+	switch (c) {
+	  case '0':
+	    geno[0] = geno[1] = 0;
+	    break;
+	  case '1':
+	    geno[0] = 0;
+	    geno[1] = 1;
+	    break;
+	  case '2':
+	    geno[0] = geno[1] = 1;
+	    break;
+	  case '9': // missing data
+	    geno[0] = geno[1] = -1;
+	    break;
+	  default:
+	    fprintf(stderr, "\nERROR: bad character in genotype file: %c\n", c);
+	    exit(1);
+	    break;
+	}
+      }
+      else { // phased data
+	for(int h = 0; h < 2; h++) { // read in the allele for each haplotype
+	  c = buf[ curPersonIdx * 2 + h ];
+	  switch (c) {
+	    case '0':
+	      geno[h] = 0;
+	      break;
+	    case '1':
+	      geno[h] = 1;
+	      break;
+	    case '9':
+	      fprintf(stderr, "\nERROR: missing data in phased genotype file\n");
+	      fprintf(stderr, "       code requires complete data for all sites\n");
+	      break;
+	    default:
+	      fprintf(stderr, "\nERROR: bad character in phased Eigenstrat file: %c\n", c);
+	      exit(1);
+	      break;
+	  }
+	}
       }
 
       P::_allIndivs[curPersonIdx]->setGenotype(curHapChunk, curChunkIdx,
@@ -1865,3 +1935,4 @@ void PersonIO<P>::printImpute2SampleFile(FILE *out, bool trioDuoOnly) {
 // linker errors
 template class PersonIO<PersonBits>;
 template class PersonIO<PersonNorm>;
+template class PersonIO<PersonHapBits>;

@@ -56,7 +56,7 @@ class SuperPerson {
 
     virtual void setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
 			     int chromMarkerIdx, int geno[2]) = 0;
-    virtual void setXHetToMissing(int *numHets = NULL,
+    virtual void setXHetToMissing(FILE *log, int *numHets = NULL,
 				  int *numCalls = NULL) = 0;
 
     //////////////////////////////////////////////////////////////////

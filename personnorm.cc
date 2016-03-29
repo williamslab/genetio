@@ -70,6 +70,6 @@ void PersonNorm::setParents(char *familyid, PersonNorm *parents[2],
 }
 
 // TODO: comment
-void PersonNorm::setXHetToMissing(int *numHets, int *numCalls) {
+void PersonNorm::setXHetToMissing(FILE *log, int *numHets, int *numCalls) {
   // TODO!
 }

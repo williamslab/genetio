@@ -671,7 +671,7 @@ void PersonBits::setMissing(int hapChunkNum, int chunkIdx) {
 // sites and the number of called (non-missing) sites for <this>.  Those
 // counts are *before* setting heterozygous sites to missing.
 // Code assumes that the entire dataset is the X chromosome
-void PersonBits::setXHetToMissing(int *numHets, int *numCalls) {
+void PersonBits::setXHetToMissing(FILE *log, int *numHets, int *numCalls) {
 //  assert(Marker::getMarker(0)->getChrom() == CHR_X);
 //  assert(Marker::getNumChromMarkers(CHR_X) == Marker::getNumMarkers());
   assert(getSex() == 'M');

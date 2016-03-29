@@ -6,61 +6,53 @@
 #include "marker.h"
 #include "superperson.h"
 #include "personio.h"
-#include "dynarray.h"
 
-#ifndef PERSONNORM_H
-#define PERSONNORM_H
+#ifndef PERSONHAPBITS_H
+#define PERSONHAPBITS_H
 
-struct Genotype {
-  int & operator[] (int h) { return a[h]; }
-
-  // The two alleles of this Genotype
-  int a[2];
-};
-
-class PersonNorm : public SuperPerson {
+class PersonHapBits : public SuperPerson {
   public:
     //////////////////////////////////////////////////////////////////
     // public static methods
     //////////////////////////////////////////////////////////////////
 
-    static PersonNorm * lookupId(char *id) { return _idToPerson.lookup(id); }
+    static PersonHapBits * lookupId(char *id) { return _idToPerson.lookup(id); }
 
-    friend class PersonIO<PersonNorm>;
+    friend class PersonIO<PersonHapBits>;
 
     //////////////////////////////////////////////////////////////////
     // public methods
     //////////////////////////////////////////////////////////////////
 
-    PersonNorm(char *id, char sex, int popIndex, short familyIdLength = 0);
-    ~PersonNorm();
+    PersonHapBits(char *id, char sex, int popIndex, short familyIdLength = 0);
+    ~PersonHapBits();
 
     int getGenotype(int chunkNum, int chunkIdx, int chromIdx,
-		    int chromMarkerIdx) {
-      int markerNum = Marker::getFirstMarkerNum(chromIdx) + chromMarkerIdx;
-      assert(Marker::getMarker(markerNum)->getNumAlleles() <= 2);
-      return _geno[chromIdx][chromMarkerIdx][0] +
-					    _geno[chromIdx][chromMarkerIdx][1];
+		    int chromMarkerIdx)
+		    { return getGenotype(chunkNum, chunkIdx); }
+    int getGenotype(int chunkNum, int chunkIdx) {
+      int alleleSum = 0;
+      for(int h = 0; h < 2; h++) {
+	alleleSum += (_hap[h][chunkNum] >> chunkIdx) & 1;
+      }
+
+      return alleleSum;
     }
     int getHapAllele(int homolog, int chunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx) {
-      return _geno[chromIdx][chromMarkerIdx][homolog];
+      return (_hap[homolog][chunkNum] >> chunkIdx) & 1;
     }
 
-    // Note: these next two methods are currently only used by PersonIO:
-    // isUnrelated() really doesn't apply for PersonNorm, which is
-    // intended to be used for family-based phasing; samples are not
-    // from a population
-    bool isUnrelated() { return false; }
     bool isPhased() { return true; }
+    bool isUnrelated() { return true; }
 
     //////////////////////////////////////////////////////////////////
     // public static variables
     //////////////////////////////////////////////////////////////////
 
-    static dynarray<PersonNorm *> _allIndivs;
-    // Hash from PersonNorm ids to PersonNorm *
-    static Hashtable<char *, PersonNorm *> _idToPerson;
+    static dynarray<PersonHapBits *> _allIndivs;
+    // Hash from PersonHapBits ids to PersonHapBits *
+    static Hashtable<char *, PersonHapBits *> _idToPerson;
 
   private:
     //////////////////////////////////////////////////////////////////
@@ -69,7 +61,7 @@ class PersonNorm : public SuperPerson {
 
     // Nothing to clean up after parsing all the persons; the one
     // parameter to this function applies to a different Person class
-    static void cleanUpPostParse(bool dontcare) { }
+    static void cleanUpPostParse(bool keepTrioKids) { }
 
     //////////////////////////////////////////////////////////////////
     // private methods
@@ -77,9 +69,10 @@ class PersonNorm : public SuperPerson {
 
     void setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx, int geno[2]);
-    void setParents(char *familyid, PersonNorm *parents[2],
+    void setParents(char *familyid, PersonHapBits *parents[2],
 		    int numParents, bool &warningPrinted, FILE *log,
 		    int *numMendelError, int *numMendelCounted);
+
     // Used for males on the X chromosome: heterozygous sites are erroneous
     void setXHetToMissing(FILE *log, int *numHets = NULL, int *numCalls = NULL);
 
@@ -87,14 +80,9 @@ class PersonNorm : public SuperPerson {
     // private variables
     //////////////////////////////////////////////////////////////////
 
-    // Stores genotypes for <this>.  Genotypes are indexed first by chromosome
-    // then by marker number.  Markers are ordered by physical position on each
-    // chromosome.
-    Genotype **_geno;
-
-    // Pointers to parents of <this>. _parents[0] is the father,
-    // _parents[1] is the mother
-    PersonNorm *_parents[2];
+    // An array of bit vectors where each bit corresponds to a marker and the
+    // two alleles are encoded as either 0/1
+    chunk *_hap[2];
 };
 
-#endif // PERSONNORM_H
+#endif // PERSONHAPBITS_H

@@ -26,12 +26,12 @@ class PersonIO {
 			 int startPos, int endPos, const char *XchrName,
 			 int noFamilyId, bool vcfInput,
 			 int printTrioKids = false, FILE *log = NULL,
-			 int **numMendelError = NULL,
+			 bool phased = false, int **numMendelError = NULL,
 			 int **numMendelCounted = NULL);
     static void readVCF(const char *vcfFile, const char *onlyChr, int startPos,
 			int endPos, const char *XcharName, FILE *log = NULL);
 
-    static void readIndivs(FILE *in);
+    static void readIndivs(FILE *in, FILE *log, bool phased);
     static bool readPedOrFamFile(FILE *in, bool omitFamilyId,
 				 bool knowIsFam = false);
     static void makePersonsFromIds(char **ids, uint32_t numIds);
@@ -51,7 +51,7 @@ class PersonIO {
     static void printImpute2SampleFile(FILE *out, bool trioDuoOnly = false);
 
     static void parsePackedAncestryMapFormat(FILE *in);
-    static void parseEigenstratFormat(FILE *in);
+    static void parseEigenstratFormat(FILE *in, bool phased);
     static void parsePlinkBedFormat(FILE *in);
     static void parseVCFGenotypes(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 				  const char *vcfFile, FILE *outs[2]);
