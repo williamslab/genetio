@@ -137,9 +137,6 @@ class PersonBits : public SuperPerson {
 
     bool isPhased() { return _resolvedHaplotype[0] != NULL ||
 					      getTrioDuoType() == TRIO_CHILD; }
-    // Used for males on the X chromosome: heterozygous sites are erroneous
-    void setXHetToMissing(int *numHets = NULL, int *numCalls = NULL);
-
     void printChunkHap(FILE *out, int chunkNum);
 
     void clearSampledHaplotypes();
@@ -204,6 +201,9 @@ class PersonBits : public SuperPerson {
 	  _tdData->_childIsHet[i] = 0;
       }
     }
+
+    // Used for males on the X chromosome: heterozygous sites are erroneous
+    void setXHetToMissing(FILE *log, int *numHets = NULL, int *numCalls = NULL);
 
     //////////////////////////////////////////////////////////////////
     // private variables
