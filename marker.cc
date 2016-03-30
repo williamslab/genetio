@@ -9,7 +9,6 @@
 #include "marker.h"
 #include "hashtable.h"
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
 dynarray<Marker *> Marker::_allMarkers(600000);
@@ -809,65 +808,15 @@ void Marker::updateWindowsMap(int initOffset, float windowLengthMorgans,
   setNumMarkersInWindow(windowStartIdx, curMarkerNum - windowStartIdx);
 }
 
-// Searches through a sorted list of physical positions
-int bin_search(dynarray<int> array, int key){
-	int i = 0;
-	int e = array.length() - 1;
-	if (key < array[i] || key > array[e]) return -1;
-	while(true){
-		int pvt = e - (e-i)/2;
-		if (e-i <= 1) break;
-		if (array[pvt] == key) return pvt;
-		key > array[pvt] ? i = pvt : e = pvt;
-	}
-	return e;
-}
-
-// Searches through sorted list as well
-int loop_search(dynarray<std::string> chromoArray, dynarray<int> array, std::string chromo, int key){
-  int index = 0;
-  if (chromoArray.length() != array.length()){
-		fprintf(stderr,
-		  "ERROR: Incorrect Array lengths between chromosomes and positions!\n");
-	  exit(1);
-	}
-
-	// TODO : hashtables of breakpoints
-	int k = 0;
-	while(chromo.compare(chromoArray[k]) != 0) k++;
-	
-	int start = k;
-
-	// TODO : There is an error when the marker is above the genetic map
-	bool found = false;
-	while ((chromo.compare(chromoArray[k]) == 0) && (k < chromoArray.length())) {
-		index = k;
-		// How to check if first?
-		if (array[k] >= key && index == start) break;
-		else if (array[k] >= key){
-			found = true;
-			break;
-		}
-		k++;
-		// fprintf(stdout, "K : %d\n", k);
-	}
-
-  if (!found){
-  	index = -1;
-  }
-
-  fprintf(stdout, "Chromosome : %s, Position : %d\n", chromo.c_str(), key);
-  return index;
-}
-
-// TODO : have it such that we can have multiple chromosomes/ genome-wide 
 void Marker::updateGeneticMap(const char *genMapFile){
-  
   FILE *genMap = fopen(genMapFile, "r");
 
-  dynarray<std::string> chromoArray = dynarray<std::string>(10000);
-  dynarray<int> physPosArray = dynarray<int>(10000);
-  dynarray<float> mapPosArray = dynarray<float>(10000);
+  dynarray<dynarray<Pair<int,float>>> chrom2physPosXmapPos = dynarray<dynarray<Pair<int,float>>>(20);
+  
+  int number_chroms = Marker::getNumChroms();
+  for (int c = 0; c < number_chroms; c++){
+    chrom2physPosXmapPos.append(dynarray<Pair<int, float>>(20000));
+  }
 
   // Reading with double buffers...
   const size_t BUF_SIZE = 2048;
@@ -878,7 +827,7 @@ void Marker::updateGeneticMap(const char *genMapFile){
   char *tmpStr = NULL;
 
   // Needed fields
-  std::string chromName;
+  char *chromName;
   int physPos;
   float mapPos;
 
@@ -912,23 +861,28 @@ void Marker::updateGeneticMap(const char *genMapFile){
     if (stat < 0) break;
     mapPos = atof(tmpStr);
 
-    // // Make sure the map is in ascending order...
-    if (chromoArray.length() > 0){
-      // We have the same chromosome
-     if (chromName.compare(chromoArray[chromoArray.length()-1]) == 0){
-      if (physPos < physPosArray[physPosArray.length()-1] || 
-        mapPos < mapPosArray[mapPosArray.length()-1]){
-        fprintf(stderr, "ERROR : genetic map not in ascending order!\n");
-        exit(1);
-      }   
-     } 
-    }
-
     if (!header){
-	    // Load all into their respective dynarrays/hashtables...
-	    chromoArray.append(chromName);
-	    physPosArray.append(physPos);
-	    mapPosArray.append(mapPos);
+      int curIndex = -1;
+      for (int i = 0; i < number_chroms; i++){
+        if (strcmp(chromName, Marker::getChromName(i)) == 0){
+          curIndex = i;
+          break;
+        }
+      }
+
+      // Checking for ordering in Genetic Map
+      if (curIndex >= 0){
+        dynarray<Pair<int, float>> curChromosome = chrom2physPosXmapPos[curIndex];
+        if (curChromosome.length() > 1){
+          Pair<int, float> prevMarker = curChromosome[curChromosome.length()-1];
+          if (physPos < prevMarker.a || mapPos < prevMarker.b){
+            fprintf(stderr, "ERROR : genetic map not in ascending order!\n");
+            exit(1);
+          }
+        }
+        Pair<int, float> posTuple = Pair<int, float>(physPos, mapPos);
+        chrom2physPosXmapPos[curIndex].append(posTuple);
+      }
   	}
 
   	// Now past the header
@@ -938,47 +892,44 @@ void Marker::updateGeneticMap(const char *genMapFile){
     bind++;
   }
 
+  // t1.printElapsedTime(stdout);
 
-  // fprintf(stdout, "Length of ChromoArray : %d\n", chromoArray.length() );
-
-
-
+  // Timer t2 = Timer::Timer();
+  // TODO : now need to keep track of previous 
+  int prevChromIdx = -1;
+  int prevIndex = 1;
   int numMarkers = Marker::getNumMarkers();
-
   for (int m = 0; m < numMarkers; m++){
     Marker *curMarker = Marker::getMarkerNonConst(m);
 
-    int physPos = curMarker->getPhysPos();
-    // TODO : case when it falls outside of the map needs optimizing
-    int low_index = -1;
-    int high_index = -1;
-
-    high_index = loop_search(chromoArray, physPosArray, curMarker->getChromName(), physPos);
-    high_index >= 0 ? low_index = high_index-1 : low_index = -1;
-
-    // Not contained within the map -> 0
-    if ((low_index == -1) &&  (high_index == -1)) {
-    	fprintf(stdout, "Bad Case!!\n");
-      curMarker->_mapPos = 0.0;
-    }
+    int chromIndex = curMarker->getChromIdx();
+    if (chromIndex != prevChromIdx){
+      prevChromIdx = chromIndex;
+      prevIndex = 1;
+    } 
+    dynarray<Pair<int, float>> curChromosome = chrom2physPosXmapPos[chromIndex];
+    int curPhysPos = curMarker->getPhysPos();
+    int N = curChromosome.length();
+    if (curPhysPos < curChromosome[0].a || curPhysPos >= curChromosome[N-1].a) curMarker->_mapPos = 0.0;   
     else{
-    	fprintf(stdout, "High Index : %d, Low Index : %d!\n", high_index, low_index);
-      float mapPos_low  = mapPosArray[low_index];
-      float mapPos_high = mapPosArray[high_index];
-      int physPos_low   = physPosArray[low_index];
-      int physPos_high  = physPosArray[high_index];
-
-      fprintf(stdout, "Past Accessing Arrays!\n");
-
-      // Linear Interpolation to detect 
-      float slope  = float(physPos - physPos_low) / float(physPos_high - physPos_low);
-      float mapPos_new = mapPos_low + slope*(mapPos_high - mapPos_low);
-
-      // Now to actually set the genetic position...
-      curMarker->_mapPos = mapPos_new;
+      for (int i = prevIndex; i < N; i++){
+        if (curPhysPos < curChromosome[i].a && curPhysPos >= curChromosome[i-1].a){
+          int physPos_low = curChromosome[i-1].a;
+          int physPos_high = curChromosome[i].a;
+          float mapPos_low = curChromosome[i-1].b;
+          float mapPos_high = curChromosome[i].b;
+          
+          // Linear Interpolation to set new mapPos
+          float slope  = float(curPhysPos - physPos_low) / float(physPos_high - physPos_low);
+          float mapPos_new = mapPos_low + slope*(mapPos_high - mapPos_low);          
+          curMarker->_mapPos = mapPos_new;
+          prevIndex = i;
+          break;
+        }
+      }
     }
   }
-
+  // t2.printElapsedTime(stdout);
 }
 
 
