@@ -808,6 +808,7 @@ void Marker::updateWindowsMap(int initOffset, float windowLengthMorgans,
   setNumMarkersInWindow(windowStartIdx, curMarkerNum - windowStartIdx);
 }
 
+
 void Marker::updateGeneticMap(const char *genMapFile){
   FILE *genMap = fopen(genMapFile, "r");
 
@@ -892,10 +893,6 @@ void Marker::updateGeneticMap(const char *genMapFile){
     bind++;
   }
 
-  // t1.printElapsedTime(stdout);
-
-  // Timer t2 = Timer::Timer();
-  // TODO : now need to keep track of previous 
   int prevChromIdx = -1;
   int prevIndex = 1;
   int numMarkers = Marker::getNumMarkers();
@@ -929,7 +926,6 @@ void Marker::updateGeneticMap(const char *genMapFile){
       }
     }
   }
-  // t2.printElapsedTime(stdout);
 }
 
 
