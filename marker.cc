@@ -907,6 +907,10 @@ void Marker::updateGeneticMap(const char *genMapFile){
     dynarray<Pair<int, float>> curChromosome = chrom2physPosXmapPos[chromIndex];
     int curPhysPos = curMarker->getPhysPos();
     int N = curChromosome.length();
+    if (N == 0){
+      fprintf(stderr, "ERROR : No Mapping Positions for Chromosome %s\n", curMarker->getChromName());
+      exit(1);
+    }
     if (curPhysPos < curChromosome[0].a || curPhysPos >= curChromosome[N-1].a) curMarker->_mapPos = 0.0;   
     else{
       for (int i = prevIndex; i < N; i++){
