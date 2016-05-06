@@ -8,6 +8,8 @@
 #ifndef SUPERPERSON_H
 #define SUPERPERSON_H
 
+#define MAX_PERSON_ID	126
+
 // Simple super class for Person* objects
 class SuperPerson {
   public:
@@ -64,15 +66,7 @@ class SuperPerson {
     //////////////////////////////////////////////////////////////////
 
     // String id for person
-    char *_id;
-
-    // Length of the family portion of the id (the IMPUTE2 file format separates
-    // the family and individual ids, so we need to be able to print the part of
-    // the string corresponding to the family id separate from the individual)
-    short _familyIdLength;
-
-    // The index number of the population for this PersonBits
-    short _popIndex;
+    char _id[MAX_PERSON_ID];
 
     // Sex for person -- 'M', 'F', or 'U'
     char _sex;
@@ -81,6 +75,14 @@ class SuperPerson {
     // PersonIO<PersonBits>::removeIgnoreIndivs() should be called on the list
     // of indivs
     bool _ignore;
+
+    // Length of the family portion of the id (the IMPUTE2 file format separates
+    // the family and individual ids, so we need to be able to print the part of
+    // the string corresponding to the family id separate from the individual)
+    short _familyIdLength;
+
+    // The index number of the population for this PersonBits
+    short _popIndex;
 };
 
 #endif // SUPERPERSON_H

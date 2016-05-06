@@ -21,9 +21,13 @@ SuperPerson::SuperPerson(char *id, char sex, int popIndex,
   _ignore = (_popIndex == -1) ? true : false;
   if (!_ignore) {
     int idLength = strlen(id);
+    if (idLength > MAX_PERSON_ID - 1) { // -1 for null terminating character
+      fprintf(stderr, "Error: id %s is more than the maximum length of %d characters\n",
+	      id, MAX_PERSON_ID - 1);
+      exit(5);
+    }
     if (idLength > _maxPersonIdLength)
       _maxPersonIdLength = idLength;
-    _id = new char[ idLength + 1 ];
     strcpy(_id, id);
     _familyIdLength = familyIdLength;
     _sex = sex;
@@ -42,6 +46,4 @@ SuperPerson::SuperPerson(char *id, char sex, int popIndex,
 }
 
 SuperPerson::~SuperPerson() {
-  if (!_ignore)
-    delete [] _id;
 }
