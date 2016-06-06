@@ -7,6 +7,7 @@
 #include <string.h>
 #include <math.h>
 #include "marker.h"
+#include "hashtable.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
@@ -806,6 +807,131 @@ void Marker::updateWindowsMap(int initOffset, float windowLengthMorgans,
   int curMarkerNum = _allMarkers.length();
   setNumMarkersInWindow(windowStartIdx, curMarkerNum - windowStartIdx);
 }
+
+
+void Marker::updateGeneticMap(const char *genMapFile){
+  FILE *genMap = fopen(genMapFile, "r");
+
+  dynarray<dynarray<Pair<int,float>>> chrom2physPosXmapPos = dynarray<dynarray<Pair<int,float>>>(20);
+  
+  int number_chroms = Marker::getNumChroms();
+  for (int c = 0; c < number_chroms; c++){
+    chrom2physPosXmapPos.append(dynarray<Pair<int, float>>(20000));
+  }
+
+  // Reading with double buffers...
+  const size_t BUF_SIZE = 2048;
+  char buf1[BUF_SIZE], buf2[BUF_SIZE];
+  char *curBuf, *nextBuf;
+  size_t nread; // number of chars read into <curBuf>
+  size_t bind = 0; // current buffer index in <curBuf> (during parsing below)
+  char *tmpStr = NULL;
+
+  // Needed fields
+  char *chromName;
+  int physPos;
+  float mapPos;
+
+  curBuf = buf1;
+  nextBuf = buf2;
+
+  nread = fread(curBuf, sizeof(char), BUF_SIZE, genMap);
+  bool header = true;
+
+  while(1){
+
+    // Line reading status
+    int stat;
+
+    // Read in the chromosome
+    stat = readDoubleBuffer(genMap, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
+    if (stat < 0) break;
+    chromName = tmpStr;
+
+    // Read in the physical position
+    stat = readDoubleBuffer(genMap, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
+    if (stat < 0) break;
+    physPos = atoi(tmpStr);
+
+    // Read in the recombination rate
+    stat = readDoubleBuffer(genMap, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
+    if (stat < 0) break;
+
+    // Read in the centimorgan distance
+    stat = readDoubleBuffer(genMap, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
+    if (stat < 0) break;
+    mapPos = atof(tmpStr);
+
+    if (!header){
+      int curIndex = -1;
+      for (int i = 0; i < number_chroms; i++){
+        if (strcmp(chromName, Marker::getChromName(i)) == 0){
+          curIndex = i;
+          break;
+        }
+      }
+
+      // Checking for ordering in Genetic Map
+      if (curIndex >= 0){
+        dynarray<Pair<int, float>> curChromosome = chrom2physPosXmapPos[curIndex];
+        if (curChromosome.length() > 1){
+          Pair<int, float> prevMarker = curChromosome[curChromosome.length()-1];
+          if (physPos < prevMarker.a || mapPos < prevMarker.b){
+            fprintf(stderr, "ERROR : genetic map not in ascending order!\n");
+            exit(1);
+          }
+        }
+        Pair<int, float> posTuple = Pair<int, float>(physPos, mapPos);
+        chrom2physPosXmapPos[curIndex].append(posTuple);
+      }
+  	}
+
+  	// Now past the header
+    if (header){
+      header = false;
+    }
+    bind++;
+  }
+
+  int prevChromIdx = -1;
+  int prevIndex = 1;
+  int numMarkers = Marker::getNumMarkers();
+  for (int m = 0; m < numMarkers; m++){
+    Marker *curMarker = Marker::getMarkerNonConst(m);
+
+    int chromIndex = curMarker->getChromIdx();
+    if (chromIndex != prevChromIdx){
+      prevChromIdx = chromIndex;
+      prevIndex = 1;
+    } 
+    dynarray<Pair<int, float>> curChromosome = chrom2physPosXmapPos[chromIndex];
+    int curPhysPos = curMarker->getPhysPos();
+    int N = curChromosome.length();
+    if (N == 0){
+      fprintf(stderr, "ERROR : No Mapping Positions for Chromosome %s\n", curMarker->getChromName());
+      exit(1);
+    }
+    if (curPhysPos < curChromosome[0].a || curPhysPos >= curChromosome[N-1].a) curMarker->_mapPos = 0.0;   
+    else{
+      for (int i = prevIndex; i < N; i++){
+        if (curPhysPos < curChromosome[i].a && curPhysPos >= curChromosome[i-1].a){
+          int physPos_low = curChromosome[i-1].a;
+          int physPos_high = curChromosome[i].a;
+          float mapPos_low = curChromosome[i-1].b;
+          float mapPos_high = curChromosome[i].b;
+          
+          // Linear Interpolation to set new mapPos
+          float slope  = float(curPhysPos - physPos_low) / float(physPos_high - physPos_low);
+          float mapPos_new = mapPos_low + slope*(mapPos_high - mapPos_low);          
+          curMarker->_mapPos = mapPos_new;
+          prevIndex = i;
+          break;
+        }
+      }
+    }
+  }
+}
+
 
 // Sets the last marker number for <prevChromIdx> along with the first and last
 // chunk numbers
