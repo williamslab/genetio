@@ -7,6 +7,7 @@
 #include <string.h>
 #include <math.h>
 #include "marker.h"
+#include "util.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
@@ -27,12 +28,8 @@ dynarray<float> Marker::_hapWindowMapCenter;
 // Read Reich lab format .snp file
 void Marker::readSNPFile(const char *snpFile, const char *onlyChr, int startPos,
 			 int endPos) {
-  FILE *in = fopen(snpFile, "r");
-  if (!in) {
-    fprintf(stderr, "\n\nERROR: Couldn't open SNP file %s\n", snpFile);
-    perror(snpFile);
-    exit(2);
-  }
+  FILE *outs[2] = { stdout, NULL };
+  FILE *in = openRead(snpFile, "SNP", outs);
 
   readMarkers(in, onlyChr, /*type=*/ 1, startPos, endPos);
   fclose(in);
@@ -41,12 +38,8 @@ void Marker::readSNPFile(const char *snpFile, const char *onlyChr, int startPos,
 // Read PLINK format .map file
 void Marker::readMapFile(const char *mapFile, const char *onlyChr, int startPos,
 			 int endPos) {
-  FILE *in = fopen(mapFile, "r");
-  if (!in) {
-    fprintf(stderr, "\n\nERROR: Couldn't open map file %s\n", mapFile);
-    perror(mapFile);
-    exit(2);
-  }
+  FILE *outs[2] = { stdout, NULL };
+  FILE *in = openRead(mapFile, "map", outs);
 
   readMarkers(in, onlyChr, /*type=*/ 2, startPos, endPos);
   fclose(in);
@@ -55,12 +48,8 @@ void Marker::readMapFile(const char *mapFile, const char *onlyChr, int startPos,
 // Read PLINK format .bim file
 void Marker::readBIMFile(const char *bimFile, const char *onlyChr, int startPos,
 			 int endPos) {
-  FILE *in = fopen(bimFile, "r");
-  if (!in) {
-    fprintf(stderr, "\n\nERROR: Couldn't open BIM file %s\n", bimFile);
-    perror(bimFile);
-    exit(2);
-  }
+  FILE *outs[2] = { stdout, NULL };
+  FILE *in = openRead(bimFile, "BIM", outs);
 
   readMarkers(in, onlyChr, /*type=*/ 3, startPos, endPos);
   fclose(in);

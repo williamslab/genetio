@@ -4,61 +4,40 @@
 // This program is distributed under the terms of the GNU General Public License
 
 #include <string.h>
-#include "personnorm.h"
+#include "personbulk.h"
 #include "marker.h"
 #include "util.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
-dynarray<PersonNorm *> PersonNorm::_allIndivs;
-Hashtable<char *, PersonNorm *> PersonNorm::_idToPerson(2003, stringHash,
+dynarray<PersonBulk *> PersonBulk::_allIndivs;
+Hashtable<char *, PersonBulk *> PersonBulk::_idToPerson(2003, stringHash,
 							stringcmp);
-PersonNorm::fam_ht PersonNorm::_families;
+PersonBulk::fam_ht PersonBulk::_families;
+uint8_t *PersonBulk::_data;
+int      PersonBulk::_bytesPerMarker;
 
-PersonNorm::PersonNorm(char *id, char sex,int popIndex,
-		       short familyIdLength, bool allocData) :
+PersonBulk::PersonBulk(char *id, char sex, int popIndex, uint32_t sampNum,
+		       short familyIdLength) :
 		     SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
-    if (allocData) {
-      int numChroms = Marker::getNumChroms();
-      _geno = new Genotype *[numChroms];
-      for(int c = 0; c < numChroms; c++) {
-	int numChrMarkers = Marker::getNumChromMarkers(c);
-	assert(numChrMarkers > 0);
-	_geno[c] = new Genotype[numChrMarkers];
-      }
-    }
-
     if (_idToPerson.lookup(_id)) {
       fprintf(stderr, "\nERROR: multiple individuals with id %s!\n", _id);
       exit(3);
     }
 
+    _sampNum = sampNum;
+
     _idToPerson.add(_id, this);
   }
 }
 
-PersonNorm::~PersonNorm() {
-  if (!_ignore) {
-    int numChroms = Marker::getNumChroms();
-    for(int c = 0; c < numChroms; c++) {
-      delete [] _geno[c];
-    }
-  }
-}
-
-void PersonNorm::setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
-			     int chromMarkerIdx, int geno[2]) {
-  if (_ignore)
-    return; // no need/nowhere to store genotypes
-
-  for(int h = 0; h < 2; h++)
-    _geno[chromIdx][chromMarkerIdx][h] = geno[h];
+PersonBulk::~PersonBulk() {
 }
 
 // Given the parents of <this>, uses a hashtable to store the family
 // relationships (for later phasing).
-void PersonNorm::setParents(char *familyid, PersonNorm *parents[2],
+void PersonBulk::setParents(char *familyid, PersonBulk *parents[2],
 			    int numParents, bool &warningPrinted, FILE *log,
 			    int *numMendelError, int *numMendelCounted) {
   // This method does not identify non-Mendelian errors, so
@@ -75,7 +54,7 @@ void PersonNorm::setParents(char *familyid, PersonNorm *parents[2],
   fam_ht_iter it = _families.find( &parentsKey );
   if (it == _families.end()) {
     // No family yet for these parents; create and insert it
-    dynarray<PersonNorm *> *newChildren = new dynarray<PersonNorm *>;
+    dynarray<PersonBulk *> *newChildren = new dynarray<PersonBulk *>;
     newChildren->append(this); // add first child
     par_pair newParentsKey = new par_pair_real(parents[0], parents[1]);
     _families[ newParentsKey ] = newChildren;
@@ -88,6 +67,6 @@ void PersonNorm::setParents(char *familyid, PersonNorm *parents[2],
 }
 
 // TODO: comment
-void PersonNorm::setXHetToMissing(FILE *log, int *numHets, int *numCalls) {
+void PersonBulk::setXHetToMissing(FILE *log, int *numHets, int *numCalls) {
   // TODO!
 }

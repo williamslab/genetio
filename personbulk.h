@@ -3,6 +3,7 @@
 //
 // This program is distributed under the terms of the GNU General Public License
 
+#include <stdio.h>
 #include <sparsehash/dense_hash_map>
 #include <tr1/hashtable.h>
 #include "marker.h"
@@ -10,37 +11,30 @@
 #include "personio.h"
 #include "dynarray.h"
 
-#ifndef PERSONNORM_H
-#define PERSONNORM_H
+#ifndef PERSONBULK_H
+#define PERSONBULK_H
 
-struct Genotype {
-  int & operator[] (int h) { return a[h]; }
-
-  // The two alleles of this Genotype
-  int a[2];
-};
-
-class PersonNorm : public SuperPerson {
+class PersonBulk : public SuperPerson {
   public:
     //////////////////////////////////////////////////////////////////
     // type definitions
     //////////////////////////////////////////////////////////////////
 
-    typedef typename std::pair<PersonNorm*,PersonNorm*>* par_pair; //parent pair
-    typedef typename std::pair<PersonNorm*,PersonNorm*> par_pair_real;
+    typedef typename std::pair<PersonBulk*,PersonBulk*>* par_pair; //parent pair
+    typedef typename std::pair<PersonBulk*,PersonBulk*> par_pair_real;
     struct eqParPair {
       bool operator()(const par_pair k1, const par_pair k2) const {
 	return k1 == k2 || (k1->first == k2->first && k1->second == k2->second);
       }
     };
     struct hashParPair {
-      size_t operator()(PersonNorm::par_pair const key) const {
+      size_t operator()(PersonBulk::par_pair const key) const {
 	// make a better hash function?
-	return std::tr1::hash<PersonNorm*>{}(key->first) +
-	       std::tr1::hash<PersonNorm*>{}(key->second);
+	return std::tr1::hash<PersonBulk*>{}(key->first) +
+	       std::tr1::hash<PersonBulk*>{}(key->second);
       }
     };
-    typedef typename google::dense_hash_map<par_pair, dynarray<PersonNorm*> *,
+    typedef typename google::dense_hash_map<par_pair, dynarray<PersonBulk*> *,
 					    hashParPair, eqParPair> fam_ht;
     typedef typename fam_ht::const_iterator fam_ht_iter;
 
@@ -52,34 +46,38 @@ class PersonNorm : public SuperPerson {
       _families.set_empty_key(NULL);
     }
 
-    static PersonNorm * lookupId(char *id) { return _idToPerson.lookup(id); }
+    static PersonBulk * lookupId(char *id) { return _idToPerson.lookup(id); }
     static fam_ht_iter familyIter() { return _families.begin(); }
     static fam_ht_iter familyIterEnd() { return _families.end(); }
+    static fam_ht::size_type numFamilies() { return _families.size(); }
 
-    friend class PersonIO<PersonNorm>;
+    static void getBulkContainers(uint8_t **&bulk_data, int *&bytesPerMarker) {
+      bulk_data = &_data;
+      bytesPerMarker = &_bytesPerMarker;
+    }
+
+    friend class PersonIO<PersonBulk>;
 
     //////////////////////////////////////////////////////////////////
     // public methods
     //////////////////////////////////////////////////////////////////
 
-    PersonNorm(char *id, char sex, int popIndex, short familyIdLength = 0,
-	       bool allocData = true);
-    ~PersonNorm();
-
     int getGenotype(int chunkNum, int chunkIdx, int chromIdx,
 		    int chromMarkerIdx) {
-      int markerNum = Marker::getFirstMarkerNum(chromIdx) + chromMarkerIdx;
-      assert(Marker::getMarker(markerNum)->getNumAlleles() <= 2);
-      return _geno[chromIdx][chromMarkerIdx][0] +
-					    _geno[chromIdx][chromMarkerIdx][1];
+      // This function is used for outputing Eigenstrat format data. It is
+      // trivial to implement (especially if runtime performance isn't a
+      // concern) but likely won't be used.
+      fprintf(stderr, "ERROR: support for printing Eigenstrat output from PersonBulk stored data not yet implemented\n");
+      exit(9);
     }
     int getHapAllele(int homolog, int chunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx) {
-      return _geno[chromIdx][chromMarkerIdx][homolog];
+      // TODO: need to implement this once phasing code is completed
+      assert(false);
     }
 
     // Note: these next two methods are currently only used by PersonIO:
-    // isUnrelated() really doesn't apply for PersonNorm, which is
+    // isUnrelated() really doesn't apply for PersonBulk, which is
     // intended to be used for family-based phasing; samples are not
     // from a population
     bool isUnrelated() { return false; }
@@ -89,9 +87,9 @@ class PersonNorm : public SuperPerson {
     // public static variables
     //////////////////////////////////////////////////////////////////
 
-    static dynarray<PersonNorm *> _allIndivs;
-    // Hash from PersonNorm ids to PersonNorm *
-    static Hashtable<char *, PersonNorm *> _idToPerson;
+    static dynarray<PersonBulk *> _allIndivs;
+    // Hash from PersonBulk ids to PersonBulk *
+    static Hashtable<char *, PersonBulk *> _idToPerson;
 
   private:
     //////////////////////////////////////////////////////////////////
@@ -106,15 +104,35 @@ class PersonNorm : public SuperPerson {
     // private static variables
     //////////////////////////////////////////////////////////////////
 
+    // Hash table indexed by a par_pair (pair of parent PersonBulk* objects)
+    // with the value being a dynarray containin the PesonBulk* objects for
+    // the children of the couple
     static fam_ht _families;
+
+    // Stores all the genotype data in PLINK bed format: two bits per genotype
+    // in SNP-major mode. The PersonBulk objects store the location of each
+    // genotype.
+    static uint8_t *_data;
+
+    // How many bytes for each marker are contained in <data>? Need this to
+    // get data for a specific marker: data[ marker * byptesPerMarker ] points
+    // to the beginning of this data in memory
+    static int _bytesPerMarker;
 
     //////////////////////////////////////////////////////////////////
     // private methods
     //////////////////////////////////////////////////////////////////
 
+    PersonBulk(char *id, char sex, int popIndex, uint32_t sampNum,
+	       short familyIdLength = 0);
+    ~PersonBulk();
+
     void setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
-		     int chromMarkerIdx, int geno[2]);
-    void setParents(char *familyid, PersonNorm *parents[2],
+		     int chromMarkerIdx, int geno[2]) {
+      fprintf(stderr, "ERROR: PersonBulk objects do store genotype data in bulk; cannot set specific genotype values\n");
+      exit(9);
+    }
+    void setParents(char *familyid, PersonBulk *parents[2],
 		    int numParents, bool &warningPrinted, FILE *log,
 		    int *numMendelError, int *numMendelCounted);
     // Used for males on the X chromosome: heterozygous sites are erroneous
@@ -124,10 +142,12 @@ class PersonNorm : public SuperPerson {
     // private variables
     //////////////////////////////////////////////////////////////////
 
-    // Stores genotypes for <this>.  Genotypes are indexed first by chromosome
-    // then by marker number.  Markers are ordered by physical position on each
-    // chromosome.
-    Genotype **_geno;
+    // Stores the sample number of <this> (this is the 0-indexed row number of
+    // the individual in the .fam/.ind file).
+    // This is used to index into the marker data: starting from the first
+    // genotype for a given marker, the data for <this> is stored 2*_sampNum
+    // bits from that location.
+    uint32_t _sampNum;
 };
 
-#endif // PERSONNORM_H
+#endif // PERSONBULK_H

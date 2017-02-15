@@ -11,9 +11,10 @@
 #include <htslib/vcf.h>
 #include <htslib/tbx.h>
 #include <htslib/bgzf.h>
+#include <stdint.h>
 #include "personio.h"
 #include "personbits.h"
-#include "personnorm.h"
+#include "personbulk.h"
 #include "personhapbits.h"
 #include "marker.h"
 #include "util.h"
@@ -38,13 +39,21 @@
 //                  indexes as there are markers in the data
 // <numMendelCounter> if non-NULL, is the number of trios/duos examined for
 //                    Mendelian errors; a denominator for <numMendelError>
+// <allowEmptyParents> will create Person entries for a parent that does not
+//                     have genotype data. This enables finding sibling sets
+//                     and families with data for only one or neither parents
+// <bulkData> does not parse genotype data but stores it in one large memory
+//            block. As of now, only PersonBulk supports this, and calls with
+//            other Person* classes will fail. Additionally, only PLINK bed
+//            format data are supported.
 template <class P>
 void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, const char *onlyChr,
 			   int startPos, int endPos, const char *XchrName,
 			   int noFamilyId, bool vcfInput, bool printTrioKids,
 			   FILE *log, bool phased, int **numMendelError,
-			   int **numMendelCounted, bool allowEmptyParents) {
+			   int **numMendelCounted, bool allowEmptyParents,
+			   bool bulkData) {
   P::init();
 
   if (vcfInput) {
@@ -56,49 +65,18 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 
   // Not VCF input:
   // open genotype file and determine file type:
-  FILE *genoIn = fopen(genoFile, "r");
-  if (!genoIn) {
-    for (int o = 0; o < 2; o++) {
-      FILE *out = outs[o];
-      if (out == NULL)
-	continue;
-      fprintf(out, "\n\nERROR: Couldn't open genotype file %s\n", genoFile);
-    }
-    perror(genoFile);
-    exit(2);
-  }
+  FILE *genoIn = openRead(genoFile, "genotype", outs);
+  int fileType = getGenoFileType(genoIn, phased, outs);
 
-  // defaults to eigenstrat format, but the first byte in the genotype file
-  // indicate this (Packed ancestry map begin with the letters 'GENO',
-  // and PLINK BED begin with the byte value 108).
-  int fileType = 0;
-
-  int c = fgetc(genoIn);
-  ungetc(c, genoIn);
-  if (c == 'G')
-    fileType = 1; // packed ancestry map
-  else if (c == 108)
-    fileType = 2; // PLINK BED
-
-  if (phased && fileType != 0) {
-    for (int o = 0; o < 2; o++) {
-      FILE *out = outs[o];
-      if (out == NULL)
-	continue;
-      fprintf(out, "\n\nERROR: Request to read phased data in file format that is unphased\n");
-      exit(2);
-    }
+  if (bulkData && fileType != 2) {
+    mult_printf(outs, "ERROR: attempt to read bulk data for non-PLINK bed format data\n");
+    exit(7);
   }
 
   ///////////////////////////////////////////////////////////////////////
   // Parse SNP file:
 
-  for (int o = 0; o < 2; o++) {
-    FILE *out = outs[o];
-    if (out == NULL)
-      continue;
-    fprintf(out, "Parsing SNP file... ");
-  }
+  mult_printf(outs, "Parsing SNP file... ");
   fflush(stdout);
 
   if (fileType == 0 || fileType == 1) {
@@ -109,60 +87,31 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
     Marker::readBIMFile(markerFile, onlyChr, startPos, endPos);
   }
 
-  for (int o = 0; o < 2; o++) {
-    FILE *out = outs[o];
-    if (out == NULL)
-      continue;
-    fprintf(out, "done.\n");
-
-    if (Marker::getNumMarkers() == 0) {
-      fprintf(out, "\n");
-      fprintf(out, "ERROR: no markers to process.\n");
-      exit(1);
-    }
+  mult_printf(outs, "done.\n");
+  if (Marker::getNumMarkers() == 0) {
+    mult_printf(outs, "\nERROR: no markers to process.\n");
+    exit(1);
   }
 
   ///////////////////////////////////////////////////////////////////////
   // Parse individual file:
 
-  for (int o = 0; o < 2; o++) {
-    FILE *out = outs[o];
-    if (out == NULL)
-      continue;
-    fprintf(out, "Parsing individual file... ");
-  }
+  mult_printf(outs, "Parsing individual file... ");
   fflush(stdout);
 
   bool mightHaveParents = false;
-  FILE *indivIn = fopen(indFile, "r");
-  if (!indivIn) {
-    for (int o = 0; o < 2; o++) {
-      FILE *out = outs[o];
-      if (out == NULL)
-	continue;
-      fprintf(out, "\n\nERROR: Couldn't open individual file %s\n", indFile);
-    }
-    perror(indFile);
-    exit(2);
-  }
+  FILE *indivIn = openRead(indFile, "individual", outs);
 
   if (fileType == 0 || fileType == 1) {
     readIndivs(indivIn, log, phased);
   }
   else {
     assert(fileType == 2);
-    mightHaveParents = readPedOrFamFile(indivIn, noFamilyId,
-					/*knowIsFam=*/ true);
+    mightHaveParents = readPedOrFamFile(indivIn, noFamilyId,/*knowIsFam=*/true);
   }
 
-  for (int o = 0; o < 2; o++) {
-    FILE *out = outs[o];
-    if (out == NULL)
-      continue;
-    fprintf(out, "done.\n");
-  }
+  mult_printf(outs, "done.\n");
 
-  // TODO: fix this
   bool analyzingX = strcmp(Marker::getMarker(0)->getChromName(), XchrName) == 0;
   if (analyzingX && P::_numSexUnknown > 0) {
     for (int o = 0; o < 2; o++) {
@@ -179,31 +128,26 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
   ///////////////////////////////////////////////////////////////////////
   // Parse genotype file:
 
-  for (int o = 0; o < 2; o++) {
-    FILE *out = outs[o];
-    if (out == NULL)
-      continue;
-    fprintf(out, "Parsing genotype file... ");
-  }
+  mult_printf(outs, "Parsing genotype file... ");
   fflush(stdout);
 
-  if (fileType == 0) {
-    parseEigenstratFormat(genoIn, phased);
-  }
-  else if (fileType == 1) {
-    parsePackedAncestryMapFormat(genoIn);
+  if (bulkData) {
+    readPlinkBedBulk(genoIn, outs);
   }
   else {
-    assert(fileType == 2);
-    parsePlinkBedFormat(genoIn);
+    if (fileType == 0) {
+      parseEigenstratFormat(genoIn, phased);
+    }
+    else if (fileType == 1) {
+      parsePackedAncestryMapFormat(genoIn);
+    }
+    else {
+      assert(fileType == 2);
+      parsePlinkBedFormat(genoIn, outs);
+    }
   }
 
-  for (int o = 0; o < 2; o++) {
-    FILE *out = outs[o];
-    if (out == NULL)
-      continue;
-    fprintf(out, "done.\n");
-  }
+  mult_printf(outs, "done.\n");
 
   fclose(genoIn);
 
@@ -232,22 +176,12 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 
   if (numMendelError != NULL || numMendelCounted != NULL) {
     if (numMendelError == NULL || numMendelCounted == NULL) {
-      for (int o = 0; o < 2; o++) {
-	FILE *out = outs[o];
-	if (out == NULL)
-	  continue;
-	fprintf(out, "ERROR: must have both numMendelError and numMendelConter non-NULL if one is\n");
-      }
+      mult_printf(outs, "ERROR: must have both numMendelError and numMendelConter non-NULL if one is\n");
       exit(1);
     }
 
     if (!mightHaveParents) {
-      for (int o = 0; o < 2; o++) {
-	FILE *out = outs[o];
-	if (out == NULL)
-	  continue;
-	fprintf(out, "ERROR: no family relationships in fam file: can't detect Mendelian errors\n");
-      }
+      mult_printf(outs, "ERROR: no family relationships in fam file: can't detect Mendelian errors\n");
       exit(4);
     }
 
@@ -261,24 +195,13 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
   }
 
   if (mightHaveParents) {
-    for (int o = 0; o < 2; o++) {
-      FILE *out = outs[o];
-      if (out == NULL)
-	continue;
-//      fprintf(out, "Rereading fam file to identify and infer unambiguous trio/duo phase... ");
-      fprintf(out, "Rereading fam file to identify family relationships... ");
-    }
+    mult_printf(outs,"Rereading fam file to identify family relationships... ");
 
     findRelationships(indivIn, log, noFamilyId,
 		      (numMendelError == NULL) ? NULL : *numMendelError,
 		      (numMendelCounted == NULL) ? NULL : *numMendelCounted,
 		      allowEmptyParents);
-    for (int o = 0; o < 2; o++) {
-      FILE *out = outs[o];
-      if (out == NULL)
-	continue;
-      fprintf(out, "done.\n");
-    }
+    mult_printf(outs, "done.\n");
   }
 
   fclose(indivIn);
@@ -288,21 +211,52 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
   removeIgnoreIndivs();
 }
 
-// See comment above for the full verison of readData. Only unique parameter
-// here is:
-// <allowEmptyParents> will create Person entries for a parent that does not
-//                     have genotype data. This enables finding sibling sets
-//                     and families with data for only one parent
+// For reading bulk data stored in PLINK bed format files.
+// See comment above for the full verison of readData. Uses default arguments
+// for all non-supplied values. (Note that vcf format input is excluded from
+// this version of the method.)
 template <class P>
 void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, const char *onlyChr,
 			   int startPos, int endPos, const char *XchrName,
-			   int noFamilyId, bool vcfInput, FILE *log,
-			   bool allowEmptyParents) {
+			   int noFamilyId, FILE *log, bool allowEmptyParents,
+			   bool bulkData) {
   readData(genoFile, markerFile, indFile, onlyChr, startPos, endPos,
-	   XchrName, noFamilyId, vcfInput, /*printTrioKids=*/ false,
+	   XchrName, noFamilyId, /*vcfInput=*/ false, /*printTrioKids=*/ false,
 	   log, /*phased=*/ false, /*numMendelError=*/ NULL,
-	   /*numMendelCounted=*/ NULL, allowEmptyParents);
+	   /*numMendelCounted=*/ NULL, allowEmptyParents, bulkData);
+}
+
+// Returns an integer representing the type of genotype file contained in the
+// input stream <genoIn>
+// 0 = Eigenstrat
+// 1 = packed Ancestry map
+// 2 = PLINK BED
+template <class P>
+int PersonIO<P>::getGenoFileType(FILE *genoIn, bool phased, FILE *outs[2]) {
+  // defaults to eigenstrat format, but the first byte in the genotype file
+  // indicate this (Packed ancestry map begin with the letters 'GENO',
+  // and PLINK BED begin with the byte value 108).
+  int fileType = 0;
+
+  int c = fgetc(genoIn);
+  ungetc(c, genoIn);
+  if (c == 'G')
+    fileType = 1; // packed ancestry map
+  else if (c == 108)
+    fileType = 2; // PLINK BED
+
+  if (phased && fileType != 0) {
+    for (int o = 0; o < 2; o++) {
+      FILE *out = outs[o];
+      if (out == NULL)
+	continue;
+      fprintf(out, "\n\nERROR: Request to read phased data in file format that is unphased\n");
+    }
+    exit(2);
+  }
+
+  return fileType;
 }
 
 // Method to read data stored in a VCF file.
@@ -568,7 +522,7 @@ void PersonIO<P>::readIndivs(FILE *in, FILE *log, bool phased) {
       	P::_popLabels.append( newPopLabel );
       }
     }
-    P *p = new P(id, sex, popIndex);
+    P *p = new P(id, sex, popIndex, P::_allIndivs.length());
 
 
     P::_allIndivs.append(p);
@@ -580,7 +534,7 @@ void PersonIO<P>::readIndivs(FILE *in, FILE *log, bool phased) {
 // format .ped file and stores the resulting individual records in
 // <P::_allIndivs>.
 // Returns true if there are individuals with non-0 values for parents, false
-// otherwise.  If true, must call findTrioDuos() after reading the genotype
+// otherwise.  If true, must call findRelationships() after reading the genotype
 // data.
 template <class P>
 bool PersonIO<P>::readPedOrFamFile(FILE *in, bool omitFamilyId,
@@ -617,12 +571,13 @@ bool PersonIO<P>::readPedOrFamFile(FILE *in, bool omitFamilyId,
 
     P *thePerson;
     if (omitFamilyId) {
-      thePerson = new P(personid, sexLetter, popIndex);
+      thePerson = new P(personid, sexLetter, popIndex, P::_allIndivs.length());
     }
     else {
       sprintf(fullid, "%s:%s", familyid, personid);
       short familyIdLength = strlen(familyid);
-      thePerson = new P(fullid, sexLetter, popIndex, familyIdLength);
+      thePerson = new P(fullid, sexLetter, popIndex, P::_allIndivs.length(),
+			familyIdLength);
     }
     P::_allIndivs.append(thePerson);
 
@@ -680,7 +635,8 @@ void PersonIO<P>::makePersonsFromIds(char **ids, uint32_t numIds) {
   P::_popLabels.append("Unknown");
   char sexLetter = 'U';
   for(uint32_t i = 0; i < numIds; i++) {
-    P *thePerson = new P(ids[i], sexLetter, /*popIndex=*/ 0);
+    P *thePerson = new P(ids[i], sexLetter, /*popIndex=*/ 0,
+			 P::_allIndivs.length());
     P::_allIndivs.append(thePerson);
   }
 }
@@ -864,7 +820,7 @@ void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
       if (parents[p] == NULL) {
 	if (allowEmptyParents) {
 	  char sex = (p == 0) ? 'M' : 'F';
-	  parents[p] = new P(curParId, sex, /*popIndex*/0, /*noData=*/true);
+	  parents[p] = new P(curParId, sex, /*popIndex*/ 0, /*sampNum=nil=*/-1);
 	  // note: person is not in _allIndivs, but that's OK: he/she only
 	  // exists so we can link others with data together in families
 	}
@@ -1324,17 +1280,8 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in, bool phased) {
 
 // Parses a genotype file in PLINK .bed format
 template <class P>
-void PersonIO<P>::parsePlinkBedFormat(FILE *in) {
-  if (fgetc(in) != 108 || fgetc(in) != 27) { // check for PLINK BED magic header
-    fprintf(stderr, "\nERROR: reading PLINK BED: magic header missing is this a PLINK BED file?\n");
-    exit(2);
-  }
-
-  if (fgetc(in) != 1) {
-    fprintf(stderr, "\nERROR: PLINK BED file in individual-major mode\n");
-    fprintf(stderr, "File type not supported; use PLINK to convert to SNP-major mode\n");
-    exit(2);
-  }
+void PersonIO<P>::parsePlinkBedFormat(FILE *in, FILE *outs[2]) {
+  checkPlinkHeader(in, outs);
 
   int numIndivs = P::_allIndivs.length();
 
@@ -1347,6 +1294,63 @@ void PersonIO<P>::parsePlinkBedFormat(FILE *in) {
   parsePackedGenotypes(in, recordLen, buf, numIndivs, /*type=*/ 2);
 
   delete [] buf;
+}
+
+// Reads the entire PLINK .bed format data into one large chunk without further
+// processing. Currently only PersonBulk supports this storage format.
+template <class P>
+void PersonIO<P>::readPlinkBedBulk(FILE *in, FILE *outs[2]) {
+  checkPlinkHeader(in, outs);
+
+  // Get storage container for the data and also store the number of bytes in
+  // the Person* object (needed to find the location of the data for a given
+  // marker)
+  uint8_t **dataPtr;
+  int *bytesPerMarkerPtr;
+  P::getBulkContainers(dataPtr, bytesPerMarkerPtr);
+  if (dataPtr == NULL || bytesPerMarkerPtr == NULL) {
+    mult_printf(outs, "ERROR: attempt to read bulk PLINK bed format data with storage container that\n");
+    mult_printf(outs, "does not support this.\n");
+    exit(7);
+  }
+
+  int numIndivs = P::_allIndivs.length();
+  int numMarkers = Marker::getNumMarkers();
+
+  // Take away one level of dereferencing to make the math and whatnot simpler
+  // below
+  int &bytesPerMarker = *bytesPerMarkerPtr;
+  uint8_t *&data = *dataPtr;
+
+  static_assert(sizeof(uint8_t) == 1);
+  bytesPerMarker = std::ceil( ((float) numIndivs * 2) / 8 );
+  uint64_t allocBytes = (uint64_t) bytesPerMarker * numMarkers;
+  data = new uint8_t[ allocBytes ];
+
+  for(int m = 0; m < numMarkers; m++) {
+    uint32_t index = m * bytesPerMarker;
+    int ret = fread(&data[index], bytesPerMarker, sizeof(uint8_t), in);
+    if (ret == 0) {
+      fprintf(stderr, "\nERROR reading from geno file at marker %d\n", m);
+      exit(1);
+    }
+  }
+}
+
+// Reads the entire PLINK .bed format data into one large chunk without further
+// processing. Currently only PersonBulk supports this storage format.
+template <class P>
+void PersonIO<P>::checkPlinkHeader(FILE *in, FILE *outs[2]) {
+  if (fgetc(in) != 108 || fgetc(in) != 27) { // check for PLINK BED magic header
+    mult_printf(outs, "\nERROR: reading PLINK BED: magic header missing is this a PLINK BED file?\n");
+    exit(2);
+  }
+
+  if (fgetc(in) != 1) {
+    mult_printf(outs, "\nERROR: PLINK BED file in individual-major mode\n");
+    mult_printf(outs, "File type not supported; use PLINK to convert to SNP-major mode\n");
+    exit(2);
+  }
 }
 
 // Parses genotypes only (not marker information, which is done in the Marker
@@ -1490,7 +1494,6 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
 	if (tmp == '.') {
 	  geno[1] = -1; // missing data
 	  if (geno[0] != -1) {
-	    // TODO: make function for this
 	    for (int o = 0; o < 2; o++) {
 	      FILE *out = outs[o];
 	      if (out == NULL)
@@ -1738,7 +1741,7 @@ void PersonIO<P>::printGzEigenstratPhased(gzFile out) {
 
 // Print an PLINK-formatted .ped file with all samples to <out>
 template <class P>
-void PersonIO<P>::printPed(FILE *out){
+void PersonIO<P>::printPed(FILE *out) {
   int numMarkers = Marker::getNumMarkers();
   int numIndivs = P::_allIndivs.length();
 
@@ -1759,9 +1762,8 @@ void PersonIO<P>::printPed(FILE *out){
       default:  sex = 0; break;
     }
     // TODO : figure out how to include the phenotype
-    fprintf(out, "%s\t%s\t%d\t%d\t%d\t%d", 
-      curIndiv->getPopLabel(), curIndiv->getId(),
-      0, 0, sex, 0);
+    fprintf(out, "%s\t%s\t%d\t%d\t%d\t%d", curIndiv->getPopLabel(),
+	    curIndiv->getId(), 0, 0, sex, 0);
 
     // What marker index on the chromosome does the next genotype correspond to?
     int chromMarkerIdx = 0;
@@ -1975,5 +1977,5 @@ void PersonIO<P>::printImpute2SampleFile(FILE *out, bool trioDuoOnly) {
 // explicitly instantiate PersionIO with the Person classes so we don't get
 // linker errors
 template class PersonIO<PersonBits>;
-template class PersonIO<PersonNorm>;
+template class PersonIO<PersonBulk>;
 template class PersonIO<PersonHapBits>;

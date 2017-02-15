@@ -28,14 +28,31 @@ class PersonIO {
 			 bool printTrioKids = false, FILE *log = NULL,
 			 bool phased = false, int **numMendelError = NULL,
 			 int **numMendelCounted = NULL,
-			 bool allowEmptyParents = false);
+			 bool allowEmptyParents = false, bool bulkdata = false);
     static void readData(const char *genoFile, const char *markerFile,
 			 const char *indFile, const char *onlyChr,
 			 int startPos, int endPos, const char *XchrName,
-			 int noFamilyId, bool vcfInput,
-			 FILE *log, bool allowEmptyParents);
+			 int noFamilyId, FILE *log, bool allowEmptyParents,
+			 bool bulkData);
+
     static void readVCF(const char *vcfFile, const char *onlyChr, int startPos,
 			int endPos, const char *XcharName, FILE *log = NULL);
+
+    static void printEigenstratGeno(FILE *out);
+    static void printEigenstratPhased(FILE *out, int numSamples = -1);
+    static void printGzEigenstratPhased(gzFile out);
+    static void printPed(FILE *out);
+    static void printPhasedIndFile(FILE *out, bool trioDuoOnly = false);
+    static void printImpute2Haps(FILE *out);
+    static void printGzImpute2Haps(gzFile out);
+    static void printImpute2SampleFile(FILE *out, bool trioDuoOnly = false);
+
+  private:
+    //////////////////////////////////////////////////////////////////
+    // private static methods
+    //////////////////////////////////////////////////////////////////
+
+    static int  getGenoFileType(FILE *genoIn, bool phased, FILE *outs[2]);
 
     static void readIndivs(FILE *in, FILE *log, bool phased);
     static bool readPedOrFamFile(FILE *in, bool omitFamilyId,
@@ -47,26 +64,13 @@ class PersonIO {
 				  bool createMissingParents);
     static void removeIgnoreIndivs();
 
-    static void printEigenstratGeno(FILE *out);
-    static void printEigenstratPhased(FILE *out, int numSamples = -1);
-    static void printGzEigenstratPhased(gzFile out);
-    static void printPed(FILE *out);
-    static void printPhasedIndFile(FILE *out, bool trioDuoOnly = false);
-    static void printImpute2Haps(FILE *out);
-    static void printGzImpute2Haps(gzFile out);
-    static void printImpute2SampleFile(FILE *out, bool trioDuoOnly = false);
-
     static void parsePackedAncestryMapFormat(FILE *in);
     static void parseEigenstratFormat(FILE *in, bool phased);
-    static void parsePlinkBedFormat(FILE *in);
+    static void parsePlinkBedFormat(FILE *in, FILE *outs[2]);
+    static void readPlinkBedBulk(FILE *in, FILE *outs[2]);
+    static void checkPlinkHeader(FILE *in, FILE *outs[2]);
     static void parseVCFGenotypes(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 				  const char *vcfFile, FILE *outs[2]);
-
-  private:
-    //////////////////////////////////////////////////////////////////
-    // private static methods
-    //////////////////////////////////////////////////////////////////
-
     static void parsePackedGenotypes(FILE *in, int recordLen, char *buf,
 				     int numIndivs, int type);
 };

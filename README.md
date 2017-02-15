@@ -19,6 +19,6 @@ Output for unphased genotypes available in Eigenstrat format
 Internal storage formats:
 
   * Each genotype stored in three bits, implemented in PersonBits---enables rapid processing of multiple SNPs at a time using 64-bit unsigned ints
-  * A more standard format with an integer per allele at each marker, implemented in PersonNorm
+  * A bulk storage format with support for families, with each genotype stored in 2 bits (the same as PLINK bed format), implemented in PersonBulk
 
 Coming soon: support for VCF input

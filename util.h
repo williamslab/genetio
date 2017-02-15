@@ -110,4 +110,35 @@ struct RandGen {
   static std::uniform_real_distribution<> dis01;
 };
 
+// Attempts to open <filename> for reading
+// If successful, returns a FILE * to the input stream
+// On failure, prints an error message to the streams <outs> and exits
+inline FILE *openRead(const char *filename, const char *fileDescriptor,
+		      FILE *outs[2]) {
+  FILE *in = fopen(filename, "r");
+  if (!in) {
+    for (int o = 0; o < 2; o++) {
+      FILE *out = outs[o];
+      if (out == NULL)
+	continue;
+      fprintf(out, "\n\nERROR: Couldn't open %s file %s\n", fileDescriptor,
+	      filename);
+    }
+    perror(filename);
+    exit(2);
+  }
+  
+  return in;
+}
+
+// Prints the same string to two output streams in <outs>
+inline void mult_printf(FILE *outs[2], const char *msg) {
+  for (int o = 0; o < 2; o++) {
+    FILE *out = outs[o];
+    if (out == NULL)
+      continue;
+    fprintf(out, "%s", msg);
+  }
+}
+
 #endif // UTIL_H

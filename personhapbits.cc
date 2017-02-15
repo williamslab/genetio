@@ -13,8 +13,8 @@ dynarray<PersonHapBits *> PersonHapBits::_allIndivs;
 Hashtable<char *, PersonHapBits *> PersonHapBits::_idToPerson(2003, stringHash,
 							      stringcmp);
 
-PersonHapBits::PersonHapBits(char *id, char sex, int popIndex,
-			     short familyIdLength, bool normSpecific) :
+PersonHapBits::PersonHapBits(char *id, char sex, int popIndex, uint32_t sampNum,
+			     short familyIdLength) :
 		       SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
     int numHapChunks = Marker::getNumHapChunks();

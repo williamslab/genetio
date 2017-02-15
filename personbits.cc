@@ -18,8 +18,8 @@ dynarray<PersonBits *> PersonBits::_allIndivs;
 Hashtable<char *, PersonBits *> PersonBits::_idToPerson(2003, stringHash,
 							stringcmp);
 
-PersonBits::PersonBits(char *id, char sex, int popIndex,
-		       short familyIdLength, bool normSpecific) :
+PersonBits::PersonBits(char *id, char sex, int popIndex, uint32_t sampNum,
+		       short familyIdLength) :
 		       SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
     // Will update _trioDuoType and _tdData later as we read in relationships

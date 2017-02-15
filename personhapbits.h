@@ -3,6 +3,7 @@
 //
 // This program is distributed under the terms of the GNU General Public License
 
+#include <stdint.h>
 #include "marker.h"
 #include "superperson.h"
 #include "personio.h"
@@ -20,15 +21,17 @@ class PersonHapBits : public SuperPerson {
 
     static PersonHapBits * lookupId(char *id) { return _idToPerson.lookup(id); }
 
+    static void getBulkContainers(uint8_t **&bulk_data, int *&bytesPerMarker) {
+      // This class does not support bulk data storage
+      bulk_data = NULL;
+      bytesPerMarker = NULL;
+    }
+
     friend class PersonIO<PersonHapBits>;
 
     //////////////////////////////////////////////////////////////////
     // public methods
     //////////////////////////////////////////////////////////////////
-
-    PersonHapBits(char *id, char sex, int popIndex, short familyIdLength = 0,
-		  bool normSpecific = true);
-    ~PersonHapBits();
 
     int getGenotype(int chunkNum, int chunkIdx, int chromIdx,
 		    int chromMarkerIdx)
@@ -69,6 +72,10 @@ class PersonHapBits : public SuperPerson {
     //////////////////////////////////////////////////////////////////
     // private methods
     //////////////////////////////////////////////////////////////////
+
+    PersonHapBits(char *id, char sex, int popIndex, uint32_t sampNum,
+		  short familyIdLength = 0);
+    ~PersonHapBits();
 
     void setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx, int geno[2]);

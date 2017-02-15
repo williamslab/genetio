@@ -4,6 +4,7 @@
 // This program is distributed under the terms of the GNU General Public License
 
 #include <stdio.h>
+#include <stdint.h>
 #include "hapi-ur-util.h"
 #include "superperson.h"
 #include "personio.h"
@@ -64,15 +65,17 @@ class PersonBits : public SuperPerson {
 
     static PersonBits * lookupId(char *id) { return _idToPerson.lookup(id); }
 
+    static void getBulkContainers(uint8_t **&bulk_data, int *&bytesPerMarker) {
+      // This class does not support bulk data storage
+      bulk_data = NULL;
+      bytesPerMarker = NULL;
+    }
+
     friend class PersonIO<PersonBits>;
 
     //////////////////////////////////////////////////////////////////
     // public methods
     //////////////////////////////////////////////////////////////////
-
-    PersonBits(char *id, char sex, int popIndex, short familyIdLength = 0,
-	       bool normSpecific = true);
-    ~PersonBits();
 
     void empty();
 
@@ -181,6 +184,10 @@ class PersonBits : public SuperPerson {
     //////////////////////////////////////////////////////////////////
     // private methods
     //////////////////////////////////////////////////////////////////
+
+    PersonBits(char *id, char sex, int popIndex, uint32_t sampNum,
+	       short familyIdLength = 0);
+    ~PersonBits();
 
     void setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx, int geno[2]);
