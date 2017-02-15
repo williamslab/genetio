@@ -3,6 +3,8 @@
 //
 // This program is distributed under the terms of the GNU General Public License
 
+#include <sparsehash/dense_hash_map>
+#include <tr1/hashtable.h>
 #include "marker.h"
 #include "superperson.h"
 #include "personio.h"
@@ -21,10 +23,38 @@ struct Genotype {
 class PersonNorm : public SuperPerson {
   public:
     //////////////////////////////////////////////////////////////////
+    // type definitions
+    //////////////////////////////////////////////////////////////////
+
+    typedef typename std::pair<PersonNorm*,PersonNorm*>* par_pair; //parent pair
+    typedef typename std::pair<PersonNorm*,PersonNorm*> par_pair_real;
+    struct eqParPair {
+      bool operator()(const par_pair k1, const par_pair k2) const {
+	return k1 == k2 || (k1->first == k2->first && k1->second == k2->second);
+      }
+    };
+    struct hashParPair {
+      size_t operator()(PersonNorm::par_pair const key) const {
+	// make a better hash function?
+	return std::tr1::hash<PersonNorm*>{}(key->first) +
+	       std::tr1::hash<PersonNorm*>{}(key->second);
+      }
+    };
+    typedef typename google::dense_hash_map<par_pair, dynarray<PersonNorm*> *,
+					    hashParPair, eqParPair> fam_ht;
+    typedef typename fam_ht::const_iterator fam_ht_iter;
+
+    //////////////////////////////////////////////////////////////////
     // public static methods
     //////////////////////////////////////////////////////////////////
 
+    static void init() {
+      _families.set_empty_key(NULL);
+    }
+
     static PersonNorm * lookupId(char *id) { return _idToPerson.lookup(id); }
+    static fam_ht_iter familyIter() { return _families.begin(); }
+    static fam_ht_iter familyIterEnd() { return _families.end(); }
 
     friend class PersonIO<PersonNorm>;
 
@@ -32,7 +62,8 @@ class PersonNorm : public SuperPerson {
     // public methods
     //////////////////////////////////////////////////////////////////
 
-    PersonNorm(char *id, char sex, int popIndex, short familyIdLength = 0);
+    PersonNorm(char *id, char sex, int popIndex, short familyIdLength = 0,
+	       bool allocData = true);
     ~PersonNorm();
 
     int getGenotype(int chunkNum, int chunkIdx, int chromIdx,
@@ -72,6 +103,12 @@ class PersonNorm : public SuperPerson {
     static void cleanUpPostParse(bool dontcare) { }
 
     //////////////////////////////////////////////////////////////////
+    // private static variables
+    //////////////////////////////////////////////////////////////////
+
+    static fam_ht _families;
+
+    //////////////////////////////////////////////////////////////////
     // private methods
     //////////////////////////////////////////////////////////////////
 
@@ -91,10 +128,6 @@ class PersonNorm : public SuperPerson {
     // then by marker number.  Markers are ordered by physical position on each
     // chromosome.
     Genotype **_geno;
-
-    // Pointers to parents of <this>. _parents[0] is the father,
-    // _parents[1] is the mother
-    PersonNorm *_parents[2];
 };
 
 #endif // PERSONNORM_H

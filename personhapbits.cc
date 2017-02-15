@@ -14,7 +14,7 @@ Hashtable<char *, PersonHapBits *> PersonHapBits::_idToPerson(2003, stringHash,
 							      stringcmp);
 
 PersonHapBits::PersonHapBits(char *id, char sex, int popIndex,
-			     short familyIdLength) :
+			     short familyIdLength, bool normSpecific) :
 		       SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
     int numHapChunks = Marker::getNumHapChunks();

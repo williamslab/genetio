@@ -25,9 +25,15 @@ class PersonIO {
 			 const char *indFile, const char *onlyChr,
 			 int startPos, int endPos, const char *XchrName,
 			 int noFamilyId, bool vcfInput,
-			 int printTrioKids = false, FILE *log = NULL,
+			 bool printTrioKids = false, FILE *log = NULL,
 			 bool phased = false, int **numMendelError = NULL,
-			 int **numMendelCounted = NULL);
+			 int **numMendelCounted = NULL,
+			 bool allowEmptyParents = false);
+    static void readData(const char *genoFile, const char *markerFile,
+			 const char *indFile, const char *onlyChr,
+			 int startPos, int endPos, const char *XchrName,
+			 int noFamilyId, bool vcfInput,
+			 FILE *log, bool allowEmptyParents);
     static void readVCF(const char *vcfFile, const char *onlyChr, int startPos,
 			int endPos, const char *XcharName, FILE *log = NULL);
 
@@ -37,8 +43,8 @@ class PersonIO {
     static void makePersonsFromIds(char **ids, uint32_t numIds);
     static void parsePedGenotypes(FILE *in, P *thePerson);
     static void findRelationships(FILE *in, FILE *log, bool omitFamilyId,
-				  int *numMendelError = NULL,
-				  int *numMendelCounted = NULL);
+				  int *numMendelError, int *numMendelCounted,
+				  bool createMissingParents);
     static void removeIgnoreIndivs();
 
     static void printEigenstratGeno(FILE *out);

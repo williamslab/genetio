@@ -16,6 +16,8 @@ class PersonHapBits : public SuperPerson {
     // public static methods
     //////////////////////////////////////////////////////////////////
 
+    static void init() { }
+
     static PersonHapBits * lookupId(char *id) { return _idToPerson.lookup(id); }
 
     friend class PersonIO<PersonHapBits>;
@@ -24,7 +26,8 @@ class PersonHapBits : public SuperPerson {
     // public methods
     //////////////////////////////////////////////////////////////////
 
-    PersonHapBits(char *id, char sex, int popIndex, short familyIdLength = 0);
+    PersonHapBits(char *id, char sex, int popIndex, short familyIdLength = 0,
+		  bool normSpecific = true);
     ~PersonHapBits();
 
     int getGenotype(int chunkNum, int chunkIdx, int chromIdx,

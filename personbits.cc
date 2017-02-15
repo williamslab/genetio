@@ -19,7 +19,7 @@ Hashtable<char *, PersonBits *> PersonBits::_idToPerson(2003, stringHash,
 							stringcmp);
 
 PersonBits::PersonBits(char *id, char sex, int popIndex,
-		       short familyIdLength) :
+		       short familyIdLength, bool normSpecific) :
 		       SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
     // Will update _trioDuoType and _tdData later as we read in relationships

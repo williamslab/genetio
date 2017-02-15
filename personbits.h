@@ -56,6 +56,8 @@ class PersonBits : public SuperPerson {
     // public static methods
     //////////////////////////////////////////////////////////////////
 
+    static void init() { }
+
     static void printTrioEigenstratPhased(FILE *out);
 
     static void initRandSampledHaps();
@@ -68,7 +70,8 @@ class PersonBits : public SuperPerson {
     // public methods
     //////////////////////////////////////////////////////////////////
 
-    PersonBits(char *id, char sex, int popIndex, short familyIdLength = 0);
+    PersonBits(char *id, char sex, int popIndex, short familyIdLength = 0,
+	       bool normSpecific = true);
     ~PersonBits();
 
     void empty();

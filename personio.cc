@@ -31,8 +31,7 @@
 // <XchrName> if non-NULL, gaves the name of the X chromosome
 // <noFamilyId> if non-zero, when reading PLINK format data, do not print
 //            the family ids in the output file
-// <printTrioKids> if non-zero, should print the haplotypes for trio
-//                 children
+// <printTrioKids> if true, should print the haplotypes for trio children
 // <numMendelError> if non-NULL, is to be assigned a newly allocated array
 //                  with the number of non-Mendelian errors in the data for
 //                  each site. Array is expected to have the same number of
@@ -43,9 +42,11 @@ template <class P>
 void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, const char *onlyChr,
 			   int startPos, int endPos, const char *XchrName,
-			   int noFamilyId, bool vcfInput, int printTrioKids,
+			   int noFamilyId, bool vcfInput, bool printTrioKids,
 			   FILE *log, bool phased, int **numMendelError,
-			   int **numMendelCounted) {
+			   int **numMendelCounted, bool allowEmptyParents) {
+  P::init();
+
   if (vcfInput) {
     readVCF(genoFile, onlyChr, startPos, endPos, XchrName, log);
     return;
@@ -270,7 +271,8 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 
     findRelationships(indivIn, log, noFamilyId,
 		      (numMendelError == NULL) ? NULL : *numMendelError,
-		      (numMendelCounted == NULL) ? NULL : *numMendelCounted);
+		      (numMendelCounted == NULL) ? NULL : *numMendelCounted,
+		      allowEmptyParents);
     for (int o = 0; o < 2; o++) {
       FILE *out = outs[o];
       if (out == NULL)
@@ -284,6 +286,23 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
   P::cleanUpPostParse(printTrioKids);
 
   removeIgnoreIndivs();
+}
+
+// See comment above for the full verison of readData. Only unique parameter
+// here is:
+// <allowEmptyParents> will create Person entries for a parent that does not
+//                     have genotype data. This enables finding sibling sets
+//                     and families with data for only one parent
+template <class P>
+void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
+			   const char *indFile, const char *onlyChr,
+			   int startPos, int endPos, const char *XchrName,
+			   int noFamilyId, bool vcfInput, FILE *log,
+			   bool allowEmptyParents) {
+  readData(genoFile, markerFile, indFile, onlyChr, startPos, endPos,
+	   XchrName, noFamilyId, vcfInput, /*printTrioKids=*/ false,
+	   log, /*phased=*/ false, /*numMendelError=*/ NULL,
+	   /*numMendelCounted=*/ NULL, allowEmptyParents);
 }
 
 // Method to read data stored in a VCF file.
@@ -435,7 +454,7 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
       if (onlyChr)
 	fprintf(out, "ERROR: Could not locate position %s:%d-%d\n", onlyChr,
 		startPos, endPos);
-	fprintf(out, "ERROR: Could not initialize a Tabix iterator\n");
+      fprintf(out, "ERROR: Could not initialize a Tabix iterator\n");
     }
     exit(2);
   }
@@ -793,11 +812,14 @@ void PersonIO<P>::parsePedGenotypes(FILE *in, P *thePerson) {
 // non-missing data that were examined for Mendelian errors. These values are
 // assumed to point to arrays with size of the number of markers in the data
 // with values initialized to 0.
+// <allowEmptyParents> for scenarios when we want to identify families based on
+//  the parent ids even if the parent data are missing.
 template <class P>
 void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
-				    int *numMendelError,
-				    int *numMendelCounted) {
+				    int *numMendelError, int *numMendelCounted,
+				    bool allowEmptyParents) {
   char familyid[81], parentsids[2][81];
+  FILE *outs[2] = { stdout, log };
 
   bool warningPrinted = false; // have we printed a warning yet?
 
@@ -840,37 +862,43 @@ void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
       parents[p] = P::lookupId(curParId);
 
       if (parents[p] == NULL) {
-	if (!warningPrinted) {
-	  printf("\n");
-	  if (log != NULL) fprintf(log, "\n");
-	  warningPrinted = true;
+	if (allowEmptyParents) {
+	  char sex = (p == 0) ? 'M' : 'F';
+	  parents[p] = new P(curParId, sex, /*popIndex*/0, /*noData=*/true);
+	  // note: person is not in _allIndivs, but that's OK: he/she only
+	  // exists so we can link others with data together in families
 	}
-	printf("WARNING: parent id %s of person %s does not exist\n",
-	       curParId, thePerson->getId());
-	if (log != NULL)
-	  fprintf(log, "WARNING: parent id %s of person %s does not exist\n",
-		  curParId, thePerson->getId());
-	missingParents = true;
-	numParents--;
+	else {
+	  for(int o = 0; o < 2; o++) {
+	    FILE *out = outs[o];
+	    if (out == NULL)
+	      continue;
+	    if (!warningPrinted)
+	      fprintf(out, "\n");
+	    fprintf(out, "WARNING: parent id %s of person %s does not exist\n",
+		    curParId, thePerson->getId());
+	  }
+	  warningPrinted = true;
+	  missingParents = true;
+	  numParents--;
+	}
       }
     }
 
     if (numParents == 0) {
       assert(missingParents); // must be true
-      printf("  no family relationships included for child %s: treating as unrelated\n",
-	     thePerson->getId());
-      if (log != NULL)
-	fprintf(log, "  no family relationships included for child %s: treating as unrelated\n",
-		thePerson->getId());
+      for(int o = 0; o < 2; o++)
+	if (outs[o] != NULL)
+	  fprintf(outs[o], "  no family relationships included for child %s: treating as unrelated\n",
+		  thePerson->getId());
       continue;
     }
     else if (missingParents) {
       assert(numParents == 1); // must be true
-      printf("  only one parent for for child %s: treating as duo\n",
-	     thePerson->getId());
-      if (log != NULL)
-	fprintf(log, "  only one parent for child %s: treating as duo\n",
-		thePerson->getId());
+      for(int o = 0; o < 2; o++)
+	if (outs[o] != NULL)
+	  fprintf(outs[o],"  only one parent for child %s: treating as duo\n",
+		  thePerson->getId());
     }
 
     assert(numParents > 0);
@@ -880,28 +908,38 @@ void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
 	continue;
 
       if (p == 0 && parents[p] != NULL && parents[p]->getSex() == 'F') {
-	if (!warningPrinted) {
-	  printf("\n");
-	  if (log != NULL) fprintf(log, "\n");
-	  warningPrinted = true;
-	}
-	printf("WARNING: father id %s is listed as female elsewhere\n",
-	       parents[p]->getId());
-	if (log != NULL)
-	  fprintf(log, "WARNING: father id %s is listed as female elsewhere\n",
+	for(int o = 0; o < 2; o++) {
+	  FILE *out = outs[o];
+	  if (out == NULL)
+	    continue;
+	  if (!warningPrinted)
+	    fprintf(out, "\n");
+	  if (allowEmptyParents) { //here we really want consistency, so error
+	    fprintf(out,"ERROR: father id %s is listed as female elsewhere\n",
+		    parents[p]->getId());
+	    exit(5);
+	  }
+	  fprintf(out,"WARNING: father id %s is listed as female elsewhere\n",
 		  parents[p]->getId());
+	}
+	warningPrinted = true;
       }
       if (p == 1 && parents[p] != NULL && parents[p]->getSex() == 'M') {
-	if (!warningPrinted) {
-	  printf("\n");
-	  if (log != NULL) fprintf(log, "\n");
-	  warningPrinted = true;
-	}
-	printf("WARNING: mother id %s is listed as male elsewhere\n",
-	       parents[p]->getId());
-	if (log != NULL)
-	  fprintf(log, "WARNING: mother id %s is listed as male elsewhere\n",
+	for(int o = 0; o < 2; o++) {
+	  FILE *out = outs[o];
+	  if (out == NULL)
+	    continue;
+	  if (!warningPrinted)
+	    fprintf(out, "\n");
+	  if (allowEmptyParents) { //here we really want consistency, so error
+	    fprintf(out, "ERROR: mother id %s is listed as male elsewhere\n",
+		    parents[p]->getId());
+	    exit(5);
+	  }
+	  fprintf(out, "WARNING: mother id %s is listed as male elsewhere\n",
 		  parents[p]->getId());
+	}
+	warningPrinted = true;
       }
     }
 
