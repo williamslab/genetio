@@ -1,4 +1,5 @@
 .deps
 *.o
+.*.swp
 tags
 libgenetio.a
