@@ -62,6 +62,19 @@ class PersonBulk : public SuperPerson {
     // public methods
     //////////////////////////////////////////////////////////////////
 
+    uint8_t getBitGeno(int marker) {
+      // Samples that don't have data (i.e., parents who had a PersonBulk entry
+      // created for them though no genotype data exists) have _sampNum == -1:
+      if (_sampNum == (uint32_t) -1)
+	return 1; // equivalent to PLINK's missing data value
+
+      uint64_t bitNum = _sampNum * 2;
+      int byteShift = bitNum / 8;
+      uint32_t index = (uint32_t) marker * _bytesPerMarker + byteShift;
+      // extract two bits at the relevant position in this byte:
+      return (_data[index] >> (bitNum % 8)) & 3;
+    }
+
     int getGenotype(int chunkNum, int chunkIdx, int chromIdx,
 		    int chromMarkerIdx) {
       // This function is used for outputing Eigenstrat format data. It is
