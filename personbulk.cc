@@ -7,15 +7,19 @@
 #include "personbulk.h"
 #include "marker.h"
 #include "util.h"
+#include "nuclearfamily.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
 dynarray<PersonBulk *> PersonBulk::_allIndivs;
 Hashtable<char *, PersonBulk *> PersonBulk::_idToPerson(2003, stringHash,
 							stringcmp);
-PersonBulk::fam_ht PersonBulk::_families;
 uint8_t *PersonBulk::_data;
 int      PersonBulk::_bytesPerMarker;
+
+void PersonBulk::init() {
+  NuclearFamily::init();
+}
 
 PersonBulk::PersonBulk(char *id, char sex, int popIndex, uint32_t sampNum,
 		       short familyIdLength) :
@@ -49,21 +53,7 @@ void PersonBulk::setParents(char *familyid, PersonBulk *parents[2],
     // can't identify siblings
     return;
 
-  par_pair_real parentsKey(parents[0], parents[1]);
-
-  fam_ht_iter it = _families.find( &parentsKey );
-  if (it == _families.end()) {
-    // No family yet for these parents; create and insert it
-    dynarray<PersonBulk *> *newChildren = new dynarray<PersonBulk *>;
-    newChildren->append(this); // add first child
-    par_pair newParentsKey = new par_pair_real(parents[0], parents[1]);
-    _families[ newParentsKey ] = newChildren;
-  }
-  else {
-    // Have a family: append child to list of children
-    // <*it> is a pair with <it->first> being the key and <it->second> the value
-    it->second->append(this);
-  }
+  NuclearFamily::addChild(parents, /*child=*/ this);
 }
 
 // TODO: comment

@@ -17,39 +17,12 @@
 class PersonBulk : public SuperPerson {
   public:
     //////////////////////////////////////////////////////////////////
-    // type definitions
-    //////////////////////////////////////////////////////////////////
-
-    typedef typename std::pair<PersonBulk*,PersonBulk*>* par_pair; //parent pair
-    typedef typename std::pair<PersonBulk*,PersonBulk*> par_pair_real;
-    struct eqParPair {
-      bool operator()(const par_pair k1, const par_pair k2) const {
-	return k1 == k2 || (k1->first == k2->first && k1->second == k2->second);
-      }
-    };
-    struct hashParPair {
-      size_t operator()(PersonBulk::par_pair const key) const {
-	// make a better hash function?
-	return std::tr1::hash<PersonBulk*>{}(key->first) +
-	       std::tr1::hash<PersonBulk*>{}(key->second);
-      }
-    };
-    typedef typename google::dense_hash_map<par_pair, dynarray<PersonBulk*> *,
-					    hashParPair, eqParPair> fam_ht;
-    typedef typename fam_ht::const_iterator fam_ht_iter;
-
-    //////////////////////////////////////////////////////////////////
     // public static methods
     //////////////////////////////////////////////////////////////////
 
-    static void init() {
-      _families.set_empty_key(NULL);
-    }
+    static void init();
 
     static PersonBulk * lookupId(char *id) { return _idToPerson.lookup(id); }
-    static fam_ht_iter familyIter() { return _families.begin(); }
-    static fam_ht_iter familyIterEnd() { return _families.end(); }
-    static fam_ht::size_type numFamilies() { return _families.size(); }
 
     static void getBulkContainers(uint8_t **&bulk_data, int *&bytesPerMarker) {
       bulk_data = &_data;
@@ -94,7 +67,7 @@ class PersonBulk : public SuperPerson {
     // intended to be used for family-based phasing; samples are not
     // from a population
     bool isUnrelated() { return false; }
-    bool isPhased() { return true; }
+    bool isPhased() { return false; }
 
     //////////////////////////////////////////////////////////////////
     // public static variables
@@ -116,11 +89,6 @@ class PersonBulk : public SuperPerson {
     //////////////////////////////////////////////////////////////////
     // private static variables
     //////////////////////////////////////////////////////////////////
-
-    // Hash table indexed by a par_pair (pair of parent PersonBulk* objects)
-    // with the value being a dynarray containin the PesonBulk* objects for
-    // the children of the couple
-    static fam_ht _families;
 
     // Stores all the genotype data in PLINK bed format: two bits per genotype
     // in SNP-major mode. The PersonBulk objects store the location of each
