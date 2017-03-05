@@ -28,3 +28,112 @@ void NuclearFamily::addChild(PersonBulk *parents[2], PersonBulk *child) {
     it->second->_children.append(child);
   }
 }
+
+// Prints the haplotypes for <this> to <out>
+void NuclearFamily::printHaplotypes(FILE *out) {
+  int numChildren = _children.length();
+
+  /////////////////////////////////////////////////////////////////////////
+  // Print header
+  fprintf(out, "%s %s", _parents->first->getId(), _parents->second->getId());
+  for(int c = 0; c < numChildren; c++) {
+    fprintf(out, " %s", _children[c]->getId());
+  }
+  fprintf(out, "\n");
+
+  /////////////////////////////////////////////////////////////////////////
+  // Print haplotypes
+  int numMarkers = Marker::getNumMarkers();
+  for(int m = 0; m < numMarkers; m++) {
+    const char *alleles = Marker::getMarker(m)->getAlleleStr();
+
+    PhaseStatus status = _phase[m].status;
+    // TODO: can move declarations down if we encapsulate cases in { }
+    uint8_t parentData, hetParent, parentPhase;
+    uint64_t childrenData, iv;
+    char parAlleles[2][2];
+    switch(status) {
+      case PHASE_UNINFORM:
+      case PHASE_AMBIG:
+      case PHASE_ERROR:
+	///////////////////////////////////////////////////////////////////////
+	// Not phased / trivially phased cases:
+
+	// print the parent's genotypes
+	parentData = _phase[m].parentData;
+	printGeno(out, alleles, parentData & 3);
+	fprintf(out, " ");
+	printGeno(out, alleles, parentData >> 2);
+	switch(status) {
+	  case PHASE_UNINFORM:
+	    fprintf(out, " |");
+	    break;
+	  case PHASE_AMBIG:
+	    fprintf(out, " ?");
+	    break;
+	  case PHASE_ERROR:
+	    fprintf(out, " E");
+	    break;
+	  case PHASE_OK: // can't get here but put case in to prevent warning
+	    break;
+	}
+
+	// print the children's genotypes
+	childrenData = _phase[m].iv;
+	for(int c = 0; c < numChildren; c++) {
+	  fprintf(out, " ");
+	  printGeno(out, alleles, childrenData & 3);
+	  childrenData >>= 2;
+	}
+	fprintf(out, "\n");
+	break;
+
+      case PHASE_OK:
+	///////////////////////////////////////////////////////////////////////
+	// Standard phased marker
+
+	// first determine which alleles each parent has on each haplotype;
+	// Note that the <alleles> string has alleles at index 0 and 2
+	hetParent = _phase[m].hetParent;
+	parentPhase = _phase[m].parentPhase;
+	if (hetParent == 0 || hetParent == 1) {
+	  parAlleles[hetParent][0] =
+			    alleles[ 0 * (1 - parentPhase) + 2 * parentPhase ];
+	  parAlleles[hetParent][1] =
+			    alleles[ 2 - parAlleles[hetParent][0] ];
+	  parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] =
+			    alleles[ (_phase[m].homParentGeno / 3) * 2 ];
+	}
+	else {
+	  assert(hetParent == 2);
+	  parAlleles[0][0] =
+		  alleles[ 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1) ];
+	  parAlleles[0][1] =
+		  alleles[ 2 - parAlleles[0][0] ];
+	  parAlleles[1][0] =
+		  alleles[ 0 * (1 - (parentPhase >> 1)) +2*(parentPhase >> 1) ];
+	  parAlleles[1][1] =
+		  alleles[ 2 - parAlleles[1][0] ];
+	}
+
+	// print parent's haplotypes
+	fprintf(out, "%c/%c %c/%c |", parAlleles[0][0], parAlleles[0][1],
+		parAlleles[1][0], parAlleles[1][1]);
+
+	// now print children's haplotypes
+	iv = _phase[m].iv;
+	for(int c = 0; c < numChildren; c++) {
+	  uint8_t curIV = iv & 3;
+	  fprintf(out, " %c/%c", parAlleles[0][curIV & 1],
+		  parAlleles[1][curIV >> 1]);
+	  iv >>= 2;
+	}
+	fprintf(out, "\n");
+	break;
+
+      default:
+	fprintf(out, "ERROR: marker status %d\n", _phase[m].status);
+	break;
+    }
+  }
+}

@@ -13,16 +13,34 @@
 // for more details on the meaning of these values
 enum PhaseStatus {
   PHASE_OK,
+  PHASE_UNINFORM,
   PHASE_AMBIG,
   PHASE_ERROR,
 };
 
 struct PhaseVals {
+  // Inheritance vector for PHASE_OK status and contains the children's
+  // genotype data in PLINK bed format (2 bits per child) otherwise:
   uint64_t iv;
   uint64_t ambig;
-  uint8_t hetParent : 2;
-  uint8_t parentPhase : 2;
-  PhaseStatus status : 2;
+  uint8_t parentData;    // Can fit in 4 bits
+  uint8_t hetParent;     // Can fit in 2 bits
+  uint8_t homParentGeno; // Can fit in 2 bits
+  uint8_t parentPhase;   // Can fit in 2 bits
+  PhaseStatus status;    // Can fit in 2 bits
+};
+
+// For reference, the following are the 2-bit values of all the genotypes
+// in PLINK format data:
+// 0 - homozygous for allele 0
+// 1 - missing
+// 2 - heterozygous
+// 3 - homozygous for allele 1
+enum Geno {
+  G_HOM0 = 0,
+  G_MISS = 1,
+  G_HET  = 2,
+  G_HOM1 = 3
 };
 
 class NuclearFamily {
@@ -71,20 +89,26 @@ class NuclearFamily {
     int numChildren() { return _children.length(); }
     void initFam() { _phase = new PhaseVals[ Marker::getNumMarkers() ]; }
 
-    void setStatus(int marker, PhaseStatus status) {
+    void setStatus(int marker, PhaseStatus status, uint8_t parentData,
+		   uint64_t childrenData) {
       // should only use this method to set bad status
       assert(status != PHASE_OK);
+      _phase[marker].iv = childrenData;
+      _phase[marker].parentData = parentData;
       _phase[marker].status = status;
     }
 
     void setPhase(int marker, uint64_t iv, uint64_t ambig, uint8_t hetParent,
-		  uint8_t parentPhase) {
+		  uint8_t homParentGeno, uint8_t parentPhase) {
       _phase[marker].iv = iv;
       _phase[marker].ambig = ambig;
       _phase[marker].hetParent = hetParent;
+      _phase[marker].homParentGeno = homParentGeno;
       _phase[marker].parentPhase = parentPhase;
       _phase[marker].status = PHASE_OK;
     }
+
+    void printHaplotypes(FILE *out);
 
     //////////////////////////////////////////////////////////////////
     // public variables
@@ -103,6 +127,27 @@ class NuclearFamily {
     // with the value being a dynarray containin the PesonBulk* objects for
     // the children of the couple
     static fam_ht _families;
+
+    //////////////////////////////////////////////////////////////////
+    // private methods
+    //////////////////////////////////////////////////////////////////
+
+    void printGeno(FILE *out, const char *alleles, uint8_t genotype) {
+      switch(genotype) {
+	case G_HOM0:
+	  fprintf(out, "%c/%c", alleles[0], alleles[0]);
+	  break;
+	case G_MISS:
+	  fprintf(out, "0/0");
+	  break;
+	case G_HET:
+	  fprintf(out, "%c/%c", alleles[0], alleles[2]);
+	  break;
+	case G_HOM1:
+	  fprintf(out, "%c/%c", alleles[2], alleles[2]);
+	  break;
+      }
+    }
 
     //////////////////////////////////////////////////////////////////
     // public variables
