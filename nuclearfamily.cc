@@ -97,23 +97,24 @@ void NuclearFamily::printHaplotypes(FILE *out) {
 	hetParent = _phase[m].hetParent;
 	parentPhase = _phase[m].parentPhase;
 	if (hetParent == 0 || hetParent == 1) {
-	  parAlleles[hetParent][0] =
-			    alleles[ 0 * (1 - parentPhase) + 2 * parentPhase ];
-	  parAlleles[hetParent][1] =
-			    alleles[ 2 - parAlleles[hetParent][0] ];
-	  parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] =
+	  int ind0 = 0 * (1 - parentPhase) + 2 * parentPhase;
+	  parAlleles[hetParent][0] = alleles[ind0];
+	  parAlleles[hetParent][1] = alleles[ 2 - ind0 ];
+	  // TODO: eventually require/assert that this value not be G_MISS
+	  if (_phase[m].homParentGeno == G_MISS)
+	    parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] = '0';
+	  else
+	    parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] =
 			    alleles[ (_phase[m].homParentGeno / 3) * 2 ];
 	}
 	else {
 	  assert(hetParent == 2);
-	  parAlleles[0][0] =
-		  alleles[ 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1) ];
-	  parAlleles[0][1] =
-		  alleles[ 2 - parAlleles[0][0] ];
-	  parAlleles[1][0] =
-		  alleles[ 0 * (1 - (parentPhase >> 1)) +2*(parentPhase >> 1) ];
-	  parAlleles[1][1] =
-		  alleles[ 2 - parAlleles[1][0] ];
+	  int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
+			  0 * (1 - (parentPhase >> 1)) +2*(parentPhase >> 1) };
+	  for(int p = 0; p < 2; p++) {
+	    parAlleles[p][0] = alleles[ ind0[p] ];
+	    parAlleles[p][1] = alleles[ 2 - ind0[p] ];
+	  }
 	}
 
 	// print parent's haplotypes
