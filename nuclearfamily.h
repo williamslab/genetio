@@ -28,6 +28,8 @@ struct PhaseVals {
   uint8_t homParentGeno; // Can fit in 2 bits
   uint8_t parentPhase;   // Can fit in 2 bits
   PhaseStatus status;    // Can fit in 2 bits
+  // TODO: recalculate this when needed?
+  uint8_t numRecombs;    // Since previous marker
 };
 
 // For reference, the following are the 2-bit values of all the genotypes
@@ -99,13 +101,15 @@ class NuclearFamily {
     }
 
     void setPhase(int marker, uint64_t iv, uint64_t ambig, uint8_t hetParent,
-		  uint8_t homParentGeno, uint8_t parentPhase) {
+		  uint8_t homParentGeno, uint8_t parentPhase,
+		  uint8_t numRecombs) {
       _phase[marker].iv = iv;
       _phase[marker].ambig = ambig;
       _phase[marker].hetParent = hetParent;
       _phase[marker].homParentGeno = homParentGeno;
       _phase[marker].parentPhase = parentPhase;
       _phase[marker].status = PHASE_OK;
+      _phase[marker].numRecombs = numRecombs;
     }
 
     void printHaplotypes(FILE *out);
