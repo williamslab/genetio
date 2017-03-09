@@ -57,7 +57,7 @@ void NuclearFamily::printHaplotypes(FILE *out) {
       PhaseStatus status = _phase[m].status;
       // TODO: can move declarations down if we encapsulate cases in { }
       uint8_t parentData, hetParent, parentPhase;
-      uint64_t childrenData, iv;
+      uint64_t childrenData, iv, ambig;
       char parAlleles[2][2];
       switch(status) {
 	case PHASE_UNINFORM:
@@ -131,13 +131,18 @@ void NuclearFamily::printHaplotypes(FILE *out) {
 
 	  // now print children's haplotypes
 	  iv = _phase[m].iv;
+	  ambig = _phase[m].ambig;
 	  for(int c = 0; c < numChildren; c++) {
 	    uint8_t curIV = iv & 3;
+	    uint8_t curAmbig = ambig & 1;
+	    // TODO: better name; make const and put at the top of this function
+	    char ambigType[2] = { '/', '?' };
 	    int ivs[2] = { curIV & 1, curIV >> 1 };
-	    fprintf(out, " %c/%c %c%c", parAlleles[0][ ivs[0] ],
-		    parAlleles[1][ ivs[1] ],
+	    fprintf(out, " %c%c%c %c%c", parAlleles[0][ ivs[0] ],
+		    ambigType[curAmbig], parAlleles[1][ ivs[1] ],
 		    (char) ('A' + ivs[0]), (char) ('A' + ivs[1]));
 	    iv >>= 2;
+	    ambig >>= 2;
 	  }
 	  // TODO: remove at some point
 	  if (prevM_OK >= 0) {
