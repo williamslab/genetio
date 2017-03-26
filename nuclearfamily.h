@@ -16,6 +16,7 @@ enum PhaseStatus {
   PHASE_UNINFORM,
   PHASE_AMBIG,
   PHASE_ERROR,
+  PHASE_ERR_RECOMB,
 };
 
 struct PhaseVals {
@@ -110,6 +111,10 @@ class NuclearFamily {
       _phase[marker].parentPhase = parentPhase;
       _phase[marker].status = PHASE_OK;
       _phase[marker].numRecombs = numRecombs;
+    }
+
+    const PhaseVals &getPhase(int marker) {
+      return _phase[marker];
     }
 
     void printHaplotypes(FILE *out);

@@ -44,6 +44,10 @@ void NuclearFamily::printHaplotypes(FILE *out) {
 
   /////////////////////////////////////////////////////////////////////////
   // Print haplotypes
+  // TODO: better name?
+  const char ambigType[2] = { '/', '?' };
+  const char markerType[3] = { '0', '1', 'B' };
+
   for(int c = 0; c < Marker::getNumChroms(); c++) {
     const char *chrName = Marker::getChromName(c);
 
@@ -52,7 +56,7 @@ void NuclearFamily::printHaplotypes(FILE *out) {
     for(int m = Marker::getFirstMarkerNum(c); m <= lastMarker; m++) {
       const char *alleles = Marker::getMarker(m)->getAlleleStr();
 
-      fprintf(out, "%s %-5d ", chrName, m);
+      fprintf(out, "%2s %-5d ", chrName, m);
 
       PhaseStatus status = _phase[m].status;
       // TODO: can move declarations down if we encapsulate cases in { }
@@ -63,13 +67,14 @@ void NuclearFamily::printHaplotypes(FILE *out) {
 	case PHASE_UNINFORM:
 	case PHASE_AMBIG:
 	case PHASE_ERROR:
+	case PHASE_ERR_RECOMB:
 	  /////////////////////////////////////////////////////////////////////
 	  // Not phased / trivially phased cases:
 
 	  // print the parent's genotypes
 	  parentData = _phase[m].parentData;
 	  printGeno(out, alleles, parentData & 3);
-	  fprintf(out, " ");
+	  fprintf(out, "   ");
 	  printGeno(out, alleles, parentData >> 2);
 	  switch(status) {
 	    case PHASE_UNINFORM:
@@ -80,6 +85,9 @@ void NuclearFamily::printHaplotypes(FILE *out) {
 	      break;
 	    case PHASE_ERROR:
 	      fprintf(out, " E");
+	      break;
+	    case PHASE_ERR_RECOMB:
+	      fprintf(out, " R");
 	      break;
 	    case PHASE_OK: // can't get here but put case in to prevent warning
 	      break;
@@ -126,8 +134,8 @@ void NuclearFamily::printHaplotypes(FILE *out) {
 	  }
 
 	  // print parent's haplotypes
-	  fprintf(out, "%c/%c %c/%c |", parAlleles[0][0], parAlleles[0][1],
-		  parAlleles[1][0], parAlleles[1][1]);
+	  fprintf(out, "%c/%c %c %c/%c |", parAlleles[0][0], parAlleles[0][1],
+		  markerType[hetParent], parAlleles[1][0], parAlleles[1][1]);
 
 	  // now print children's haplotypes
 	  iv = _phase[m].iv;
@@ -135,8 +143,6 @@ void NuclearFamily::printHaplotypes(FILE *out) {
 	  for(int c = 0; c < numChildren; c++) {
 	    uint8_t curIV = iv & 3;
 	    uint8_t curAmbig = ambig & 1;
-	    // TODO: better name; make const and put at the top of this function
-	    char ambigType[2] = { '/', '?' };
 	    int ivs[2] = { curIV & 1, curIV >> 1 };
 	    fprintf(out, " %c%c%c %c%c", parAlleles[0][ ivs[0] ],
 		    ambigType[curAmbig], parAlleles[1][ ivs[1] ],
