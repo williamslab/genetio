@@ -69,6 +69,8 @@ class PersonBulk : public SuperPerson {
     bool isUnrelated() { return false; }
     bool isPhased() { return false; }
 
+    bool hasData() { return _sampNum != (uint32_t) -1; }
+
     //////////////////////////////////////////////////////////////////
     // public static variables
     //////////////////////////////////////////////////////////////////
