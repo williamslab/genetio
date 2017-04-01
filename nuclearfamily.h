@@ -23,7 +23,7 @@ struct PhaseVals {
   // Inheritance vector for PHASE_OK status and contains the children's
   // genotype data in PLINK bed format (2 bits per child) otherwise:
   uint64_t iv;
-  uint64_t ambig;
+  uint64_t ambigMiss;
   uint8_t parentData;    // Can fit in 4 bits
   uint8_t hetParent;     // Can fit in 2 bits
   uint8_t homParentGeno; // Can fit in 2 bits
@@ -31,19 +31,6 @@ struct PhaseVals {
   PhaseStatus status;    // Can fit in 2 bits
   // TODO: recalculate this when needed?
   uint8_t numRecombs;    // Since previous marker
-};
-
-// For reference, the following are the 2-bit values of all the genotypes
-// in PLINK format data:
-// 0 - homozygous for allele 0
-// 1 - missing
-// 2 - heterozygous
-// 3 - homozygous for allele 1
-enum Geno {
-  G_HOM0 = 0,
-  G_MISS = 1,
-  G_HET  = 2,
-  G_HOM1 = 3
 };
 
 class NuclearFamily {
@@ -101,11 +88,15 @@ class NuclearFamily {
       _phase[marker].status = status;
     }
 
-    void setPhase(int marker, uint64_t iv, uint64_t ambig, uint8_t hetParent,
-		  uint8_t homParentGeno, uint8_t parentPhase,
-		  uint8_t numRecombs) {
+    // <ambig> should have the higher order bit (of the two bits allotted each
+    // child) set to 1 if the corresponding child has ambiguous phase.
+    // <missing> should have the lower order bit set to 1 if the corresponding
+    // child is missing data.
+    void setPhase(int marker, uint64_t iv, uint64_t ambig, uint64_t missing,
+		  uint8_t hetParent, uint8_t homParentGeno,
+		  uint8_t parentPhase, uint8_t numRecombs) {
       _phase[marker].iv = iv;
-      _phase[marker].ambig = ambig;
+      _phase[marker].ambigMiss = ambig | missing;
       _phase[marker].hetParent = hetParent;
       _phase[marker].homParentGeno = homParentGeno;
       _phase[marker].parentPhase = parentPhase;

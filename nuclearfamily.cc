@@ -45,7 +45,7 @@ void NuclearFamily::printHaplotypes(FILE *out) {
   /////////////////////////////////////////////////////////////////////////
   // Print haplotypes
   // TODO: better name?
-  const char ambigType[2] = { '/', '?' };
+  const char ambigMissType[4] = { '/', '_', '?', '!' };
   const char markerType[3] = { '0', '1', 'B' };
 
   for(int c = 0; c < Marker::getNumChroms(); c++) {
@@ -61,7 +61,7 @@ void NuclearFamily::printHaplotypes(FILE *out) {
       PhaseStatus status = _phase[m].status;
       // TODO: can move declarations down if we encapsulate cases in { }
       uint8_t parentData, hetParent, parentPhase;
-      uint64_t childrenData, iv, ambig;
+      uint64_t childrenData, iv, ambigMiss;
       char parAlleles[2][2];
       switch(status) {
 	case PHASE_UNINFORM:
@@ -134,21 +134,22 @@ void NuclearFamily::printHaplotypes(FILE *out) {
 	  }
 
 	  // print parent's haplotypes
+	  // TODO: indicate when parent's genotypes were missing
 	  fprintf(out, "%c/%c %c %c/%c |", parAlleles[0][0], parAlleles[0][1],
 		  markerType[hetParent], parAlleles[1][0], parAlleles[1][1]);
 
 	  // now print children's haplotypes
 	  iv = _phase[m].iv;
-	  ambig = _phase[m].ambig;
+	  ambigMiss = _phase[m].ambigMiss;
 	  for(int c = 0; c < numChildren; c++) {
 	    uint8_t curIV = iv & 3;
-	    uint8_t curAmbig = ambig & 1;
+	    uint8_t curAmbigMiss = ambigMiss & 3;
 	    int ivs[2] = { curIV & 1, curIV >> 1 };
 	    fprintf(out, " %c%c%c %c%c", parAlleles[0][ ivs[0] ],
-		    ambigType[curAmbig], parAlleles[1][ ivs[1] ],
+		    ambigMissType[curAmbigMiss], parAlleles[1][ ivs[1] ],
 		    (char) ('A' + ivs[0]), (char) ('A' + ivs[1]));
 	    iv >>= 2;
-	    ambig >>= 2;
+	    ambigMiss >>= 2;
 	  }
 	  // TODO: remove at some point
 	  if (prevM_OK >= 0) {

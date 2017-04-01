@@ -14,6 +14,19 @@
 #ifndef PERSONBULK_H
 #define PERSONBULK_H
 
+// For reference, the following are the 2-bit values of all the genotypes
+// in PLINK format data:
+// 0 - homozygous for allele 0
+// 1 - missing
+// 2 - heterozygous
+// 3 - homozygous for allele 1
+enum Geno {
+  G_HOM0 = 0,
+  G_MISS = 1,
+  G_HET  = 2,
+  G_HOM1 = 3
+};
+
 class PersonBulk : public SuperPerson {
   public:
     //////////////////////////////////////////////////////////////////
@@ -39,7 +52,7 @@ class PersonBulk : public SuperPerson {
       // Samples that don't have data (i.e., parents who had a PersonBulk entry
       // created for them though no genotype data exists) have _sampNum == -1:
       if (_sampNum == (uint32_t) -1)
-	return 1; // equivalent to PLINK's missing data value
+	return G_MISS;
 
       uint64_t bitNum = _sampNum * 2;
       int byteShift = bitNum / 8;
