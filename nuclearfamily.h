@@ -24,6 +24,7 @@ struct PhaseVals {
   // genotype data in PLINK bed format (2 bits per child) otherwise:
   uint64_t iv;
   uint64_t ambigMiss;
+  // Stores parent data for non-PHASE_OK. For PHASE_OK, indicates if missing
   uint8_t parentData;    // Can fit in 4 bits
   uint8_t hetParent;     // Can fit in 2 bits
   uint8_t homParentGeno; // Can fit in 2 bits
@@ -31,6 +32,10 @@ struct PhaseVals {
   PhaseStatus status;    // Can fit in 2 bits
   // TODO: recalculate this when needed?
   uint8_t numRecombs;    // Since previous marker
+  uint8_t ambigParHet;   // Can fit in 1 bit
+  // Each bit indicates presence or absence of different equal probability
+  // <parentPhase> values
+  uint8_t ambigParPhase; // Can fit in 4 bits
 };
 
 class NuclearFamily {
@@ -43,7 +48,8 @@ class NuclearFamily {
     typedef typename std::pair<PersonBulk*,PersonBulk*> par_pair_real;
     struct eqParPair {
       bool operator()(const par_pair k1, const par_pair k2) const {
-	return k1 == k2 || (k1->first == k2->first && k1->second == k2->second);
+	return k1 == k2 || (k1 && k2 && k1->first == k2->first &&
+						      k1->second == k2->second);
       }
     };
     struct hashParPair {
@@ -93,15 +99,19 @@ class NuclearFamily {
     // <missing> should have the lower order bit set to 1 if the corresponding
     // child is missing data.
     void setPhase(int marker, uint64_t iv, uint64_t ambig, uint64_t missing,
-		  uint8_t hetParent, uint8_t homParentGeno,
-		  uint8_t parentPhase, uint8_t numRecombs) {
+		  uint8_t parMissing, uint8_t hetParent, uint8_t homParentGeno,
+		  uint8_t parentPhase, uint8_t numRecombs, uint8_t ambigParHet,
+		  uint8_t ambigParPhase) {
       _phase[marker].iv = iv;
       _phase[marker].ambigMiss = ambig | missing;
+      _phase[marker].parentData = parMissing;
       _phase[marker].hetParent = hetParent;
       _phase[marker].homParentGeno = homParentGeno;
       _phase[marker].parentPhase = parentPhase;
       _phase[marker].status = PHASE_OK;
       _phase[marker].numRecombs = numRecombs;
+      _phase[marker].ambigParHet = ambigParHet;
+      _phase[marker].ambigParPhase = ambigParPhase;
     }
 
     const PhaseVals &getPhase(int marker) {

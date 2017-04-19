@@ -134,9 +134,24 @@ void NuclearFamily::printHaplotypes(FILE *out) {
 	  }
 
 	  // print parent's haplotypes
-	  // TODO: indicate when parent's genotypes were missing
-	  fprintf(out, "%c/%c %c %c/%c |", parAlleles[0][0], parAlleles[0][1],
-		  markerType[hetParent], parAlleles[1][0], parAlleles[1][1]);
+	  uint8_t parMiss[2];
+	  parMiss[0] = _phase[m].parentData & 3;
+	  parMiss[1] = (_phase[m].parentData >> 2) & 3;
+	  fprintf(out, "%c%c%c %c %c%c%c ",
+		parAlleles[0][0], ambigMissType[parMiss[0]], parAlleles[0][1],
+		markerType[hetParent],
+		parAlleles[1][0], ambigMissType[parMiss[1]], parAlleles[1][1]);
+	  if (_phase[m].ambigParPhase | _phase[m].ambigParHet) {
+	    if (_phase[m].ambigParPhase) {
+	      fprintf(out, "S");
+	      if (_phase[m].hetParent == 2)
+		fprintf(out, "%d", _phase[m].ambigParPhase);
+	    }
+	    if (_phase[m].ambigParHet)
+	      fprintf(out, "P");
+	  }
+	  else
+	    fprintf(out, "|");
 
 	  // now print children's haplotypes
 	  iv = _phase[m].iv;
