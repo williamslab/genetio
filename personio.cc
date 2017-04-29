@@ -808,19 +808,22 @@ void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
       numParents++;
 
       char *curParId;
+      short familyIdLength = 0;
       if (omitFamilyId) {
 	curParId = parentsids[p];
       }
       else {
 	sprintf(fullid, "%s:%s", familyid, parentsids[p]);
 	curParId = fullid;
+	familyIdLength = strlen(familyid);
       }
       parents[p] = P::lookupId(curParId);
 
       if (parents[p] == NULL) {
 	if (allowEmptyParents) {
 	  char sex = (p == 0) ? 'M' : 'F';
-	  parents[p] = new P(curParId, sex, /*popIndex*/ 0, /*sampNum=nil=*/-1);
+	  parents[p] = new P(curParId, sex, /*popIndex*/ 0, /*sampNum=nil=*/-1,
+			     familyIdLength);
 	  // note: person is not in _allIndivs, but that's OK: he/she only
 	  // exists so we can link others with data together in families
 	}
