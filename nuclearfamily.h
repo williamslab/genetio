@@ -17,6 +17,7 @@ enum PhaseStatus {
   PHASE_AMBIG,
   PHASE_ERROR,
   PHASE_ERR_RECOMB,
+  NUM_PHASE_STATUS
 };
 
 struct PhaseVals {
@@ -85,11 +86,14 @@ class NuclearFamily {
     int numChildren() { return _children.length(); }
     void initFam() { _phase = new PhaseVals[ Marker::getNumMarkers() ]; }
 
+    // As below, <missing> should have the lower order bit for each child that
+    // is missing set to 1.
     void setStatus(int marker, PhaseStatus status, uint8_t parentData,
-		   uint64_t childrenData) {
+		   uint64_t childrenData, uint64_t missing) {
       // should only use this method to set bad status
       assert(status != PHASE_OK);
       _phase[marker].iv = childrenData;
+      _phase[marker].ambigMiss = missing;
       _phase[marker].parentData = parentData;
       _phase[marker].status = status;
     }
@@ -118,7 +122,8 @@ class NuclearFamily {
       return _phase[marker];
     }
 
-    void printHaplotypes(FILE *out);
+    void printHapTxt(FILE *out, int chrIdx);
+    void printIvCSV(FILE *out, int chrIdx);
 
     //////////////////////////////////////////////////////////////////
     // public variables

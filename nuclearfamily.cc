@@ -30,17 +30,27 @@ void NuclearFamily::addChild(PersonBulk *parents[2], PersonBulk *child) {
   }
 }
 
-// Prints the haplotypes for <this> to <out>
-void NuclearFamily::printHaplotypes(FILE *out) {
+// Prints the haplotypes for <this> to <out> in human readable text format
+void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
   int numChildren = _children.length();
 
   /////////////////////////////////////////////////////////////////////////
   // Print header
-  fprintf(out, "%s %s", _parents->first->getId(), _parents->second->getId());
-  for(int c = 0; c < numChildren; c++) {
-    fprintf(out, " %s", _children[c]->getId());
+  int famIdLen = _parents->first->getFamilyIdLength();
+  if (famIdLen == 0) {
+    fprintf(out, "%s %s", _parents->first->getId(), _parents->second->getId());
+    for(int c = 0; c < numChildren; c++)
+      fprintf(out, " %s", _children[c]->getId());
+    fprintf(out, "\n");
   }
-  fprintf(out, "\n");
+  else {
+    fprintf(out, "(%.*s) %s %s", famIdLen, _parents->first->getId(),
+	    &_parents->first->getId()[famIdLen+1],
+	    &_parents->second->getId()[famIdLen+1]);
+    for(int c = 0; c < numChildren; c++)
+      fprintf(out, " %s", &_children[c]->getId()[famIdLen+1]);
+    fprintf(out, "\n");
+  }
 
   /////////////////////////////////////////////////////////////////////////
   // Print haplotypes
@@ -48,141 +58,280 @@ void NuclearFamily::printHaplotypes(FILE *out) {
   const char ambigMissType[4] = { '/', '_', '?', '!' };
   const char markerType[3] = { '0', '1', 'B' };
 
-  for(int c = 0; c < Marker::getNumChroms(); c++) {
-    const char *chrName = Marker::getChromName(c);
+  const char *chrName = Marker::getChromName(chrIdx);
 
-    int prevM_OK = -1;
-    int lastMarker = Marker::getLastMarkerNum(c);
-    for(int m = Marker::getFirstMarkerNum(c); m <= lastMarker; m++) {
-      const char *alleles = Marker::getMarker(m)->getAlleleStr();
+  int prevM_OK = -1;
+  int firstMarker = Marker::getFirstMarkerNum(chrIdx);
+  int lastMarker = Marker::getLastMarkerNum(chrIdx);
+  for(int m = firstMarker; m <= lastMarker; m++) {
+    const char *alleles = Marker::getMarker(m)->getAlleleStr();
 
-      fprintf(out, "%2s %-5d ", chrName, m);
+    fprintf(out, "%-2s %-5d ", chrName, m - firstMarker);
 
-      PhaseStatus status = _phase[m].status;
-      // TODO: can move declarations down if we encapsulate cases in { }
-      uint8_t parentData, hetParent, parentPhase;
-      uint64_t childrenData, iv, ambigMiss;
-      char parAlleles[2][2];
-      switch(status) {
-	case PHASE_UNINFORM:
-	case PHASE_AMBIG:
-	case PHASE_ERROR:
-	case PHASE_ERR_RECOMB:
-	  /////////////////////////////////////////////////////////////////////
-	  // Not phased / trivially phased cases:
+    PhaseStatus status = _phase[m].status;
+    uint8_t parentData, hetParent, parentPhase;
+    uint64_t childrenData, iv, ambigMiss;
+    char parAlleles[2][2];
+    switch(status) {
+      case PHASE_UNINFORM:
+      case PHASE_AMBIG:
+      case PHASE_ERROR:
+      case PHASE_ERR_RECOMB:
+	/////////////////////////////////////////////////////////////////////
+	// Not phased / trivially phased cases:
 
-	  // print the parent's genotypes
-	  parentData = _phase[m].parentData;
-	  printGeno(out, alleles, parentData & 3);
+	// print the parent's genotypes
+	parentData = _phase[m].parentData;
+	printGeno(out, alleles, parentData & 3);
+	fprintf(out, "   ");
+	printGeno(out, alleles, parentData >> 2);
+	switch(status) {
+	  case PHASE_UNINFORM:
+	    fprintf(out, " |");
+	    break;
+	  case PHASE_AMBIG:
+	    fprintf(out, " ?");
+	    break;
+	  case PHASE_ERROR:
+	    fprintf(out, " E");
+	    break;
+	  case PHASE_ERR_RECOMB:
+	    fprintf(out, " R");
+	    break;
+	  case PHASE_OK: // can't get here but put case in to prevent warning
+	  case NUM_PHASE_STATUS:
+	    break;
+	}
+
+	// print the children's genotypes
+	childrenData = _phase[m].iv;
+	for(int c = 0; c < numChildren; c++) {
+	  fprintf(out, " ");
+	  printGeno(out, alleles, childrenData & 3);
 	  fprintf(out, "   ");
-	  printGeno(out, alleles, parentData >> 2);
-	  switch(status) {
-	    case PHASE_UNINFORM:
-	      fprintf(out, " |");
-	      break;
-	    case PHASE_AMBIG:
-	      fprintf(out, " ?");
-	      break;
-	    case PHASE_ERROR:
-	      fprintf(out, " E");
-	      break;
-	    case PHASE_ERR_RECOMB:
-	      fprintf(out, " R");
-	      break;
-	    case PHASE_OK: // can't get here but put case in to prevent warning
-	      break;
-	  }
+	  childrenData >>= 2;
+	}
+	fprintf(out, "\n");
+	break;
 
-	  // print the children's genotypes
-	  childrenData = _phase[m].iv;
-	  for(int c = 0; c < numChildren; c++) {
-	    fprintf(out, " ");
-	    printGeno(out, alleles, childrenData & 3);
-	    fprintf(out, "   ");
-	    childrenData >>= 2;
-	  }
-	  fprintf(out, "\n");
-	  break;
+      case PHASE_OK:
+	/////////////////////////////////////////////////////////////////////
+	// Standard phased marker
 
-	case PHASE_OK:
-	  /////////////////////////////////////////////////////////////////////
-	  // Standard phased marker
-
-	  // first determine which alleles each parent has on each haplotype;
-	  // Note that the <alleles> string has alleles at index 0 and 2
-	  hetParent = _phase[m].hetParent;
-	  parentPhase = _phase[m].parentPhase;
-	  if (hetParent == 0 || hetParent == 1) {
-	    int ind0 = 0 * (1 - parentPhase) + 2 * parentPhase;
-	    parAlleles[hetParent][0] = alleles[ind0];
-	    parAlleles[hetParent][1] = alleles[ 2 - ind0 ];
-	    // TODO: eventually require/assert that this value not be G_MISS
-	    if (_phase[m].homParentGeno == G_MISS)
-	      parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] = '0';
-	    else
-	      parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] =
+	// first determine which alleles each parent has on each haplotype;
+	// Note that the <alleles> string has alleles at index 0 and 2
+	hetParent = _phase[m].hetParent;
+	parentPhase = _phase[m].parentPhase;
+	if (hetParent == 0 || hetParent == 1) {
+	  int ind0 = 0 * (1 - parentPhase) + 2 * parentPhase;
+	  parAlleles[hetParent][0] = alleles[ind0];
+	  parAlleles[hetParent][1] = alleles[ 2 - ind0 ];
+	  assert(_phase[m].homParentGeno != G_MISS);
+	  parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] =
 				   alleles[ (_phase[m].homParentGeno / 3) * 2 ];
-	  }
-	  else {
-	    assert(hetParent == 2);
-	    int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
+	}
+	else {
+	  assert(hetParent == 2);
+	  int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
 			  0 * (1 - (parentPhase >> 1)) + 2*(parentPhase >> 1) };
-	    for(int p = 0; p < 2; p++) {
-	      parAlleles[p][0] = alleles[ ind0[p] ];
-	      parAlleles[p][1] = alleles[ 2 - ind0[p] ];
-	    }
+	  for(int p = 0; p < 2; p++) {
+	    parAlleles[p][0] = alleles[ ind0[p] ];
+	    parAlleles[p][1] = alleles[ 2 - ind0[p] ];
 	  }
+	}
 
-	  // print parent's haplotypes
-	  uint8_t parMiss[2];
-	  parMiss[0] = _phase[m].parentData & 3;
-	  parMiss[1] = (_phase[m].parentData >> 2) & 3;
-	  fprintf(out, "%c%c%c %c %c%c%c ",
+	// print parent's haplotypes
+	uint8_t parMiss[2];
+	parMiss[0] = _phase[m].parentData & 3;
+	parMiss[1] = (_phase[m].parentData >> 2) & 3;
+	fprintf(out, "%c%c%c %c %c%c%c ",
 		parAlleles[0][0], ambigMissType[parMiss[0]], parAlleles[0][1],
 		markerType[hetParent],
 		parAlleles[1][0], ambigMissType[parMiss[1]], parAlleles[1][1]);
-	  if (_phase[m].ambigParPhase | _phase[m].ambigParHet) {
-	    if (_phase[m].ambigParPhase) {
-	      fprintf(out, "S");
-	      if (_phase[m].hetParent == 2)
-		fprintf(out, "%d", _phase[m].ambigParPhase);
-	    }
-	    if (_phase[m].ambigParHet)
-	      fprintf(out, "P");
+	if (_phase[m].ambigParPhase | _phase[m].ambigParHet) {
+	  if (_phase[m].ambigParPhase) {
+	    fprintf(out, "S");
+	    if (_phase[m].hetParent == 2)
+	      fprintf(out, "%d", _phase[m].ambigParPhase);
 	  }
-	  else
-	    fprintf(out, "|");
+	  if (_phase[m].ambigParHet)
+	    fprintf(out, "H%d", _phase[m].ambigParHet);
+	}
+	else
+	  fprintf(out, "|");
 
-	  // now print children's haplotypes
-	  iv = _phase[m].iv;
-	  ambigMiss = _phase[m].ambigMiss;
+	// now print children's haplotypes
+	iv = _phase[m].iv;
+	ambigMiss = _phase[m].ambigMiss;
+	for(int c = 0; c < numChildren; c++) {
+	  uint8_t curIV = iv & 3;
+	  uint8_t curAmbigMiss = ambigMiss & 3;
+	  int ivs[2] = { curIV & 1, curIV >> 1 };
+	  fprintf(out, " %c%c%c %c%c", parAlleles[0][ ivs[0] ],
+		  ambigMissType[curAmbigMiss], parAlleles[1][ ivs[1] ],
+		  (char) ('A' + ivs[0]), (char) ('A' + ivs[1]));
+	  iv >>= 2;
+	  ambigMiss >>= 2;
+	}
+	// TODO: remove at some point
+	if (prevM_OK >= 0) {
+	  uint8_t count = popcount(_phase[m].iv ^ _phase[prevM_OK].iv);
+	  if (_phase[m].numRecombs != count) {
+	    fprintf(out, " %2d!!!! ", count);
+	  }
+	}
+	fprintf(out, " %2d\n", _phase[m].numRecombs);
+
+	// TODO: remove
+	prevM_OK = m;
+	break;
+
+      default:
+	fprintf(out, "ERROR: marker status %d\n", _phase[m].status);
+	break;
+    }
+  }
+}
+
+void NuclearFamily::printIvCSV(FILE *out, int chrIdx) {
+  int numChildren = _children.length();
+
+  /////////////////////////////////////////////////////////////////////////
+  // Print header
+  int famIdLen = _parents->first->getFamilyIdLength();
+  if (famIdLen == 0) {
+    fprintf(out, ",%s,", _parents->first->getId());
+    for(int c = 0; c < numChildren; c++)
+      fprintf(out, "P-%s,", _children[c]->getId());
+    fprintf(out, ",%s,", _parents->second->getId());
+    for(int c = 0; c < numChildren; c++)
+      fprintf(out, "M-%s,", _children[c]->getId());
+  }
+  else {
+    // Print family id in first column, omit from all other samples
+    fprintf(out, "%.*s,%s,", famIdLen, _parents->first->getId(),
+	    &_parents->first->getId()[famIdLen+1]);
+    for(int c = 0; c < numChildren; c++)
+      fprintf(out, "P-%s,", &_children[c]->getId()[famIdLen+1]);
+    fprintf(out, "%s,", &_parents->second->getId()[famIdLen+1]);
+    for(int c = 0; c < numChildren; c++)
+      fprintf(out, "M-%s,", &_children[c]->getId()[famIdLen+1]);
+  }
+  // Print column header for recombination count and the family id
+  fprintf(out, "N_recomb,AmbigPar\n");
+
+  /////////////////////////////////////////////////////////////////////////
+  // Print inheritance vectors
+  const char *chrName = Marker::getChromName(chrIdx);
+
+  bool sawPrevIV = false;
+  uint64_t prevIV = 0;
+  int firstMarker = Marker::getFirstMarkerNum(chrIdx);
+  int lastMarker = Marker::getLastMarkerNum(chrIdx);
+  for(int m = firstMarker; m <= lastMarker; m++) {
+    fprintf(out, "%s,%s,", chrName, Marker::getMarker(m)->getName());
+
+    PhaseStatus status = _phase[m].status;
+    uint64_t iv = _phase[m].iv;
+    uint64_t ambigMiss = _phase[m].ambigMiss;
+    uint8_t hetParent = _phase[m].hetParent;
+    uint8_t numRecombs = _phase[m].numRecombs;
+    char status_indicator[NUM_PHASE_STATUS] = { '|', '|', '?', 'E', 'R' };
+    switch(status) {
+      case PHASE_AMBIG:
+      case PHASE_ERROR:
+      case PHASE_ERR_RECOMB:
+	for (int p = 0; p < 2; p++) {
 	  for(int c = 0; c < numChildren; c++) {
-	    uint8_t curIV = iv & 3;
-	    uint8_t curAmbigMiss = ambigMiss & 3;
-	    int ivs[2] = { curIV & 1, curIV >> 1 };
-	    fprintf(out, " %c%c%c %c%c", parAlleles[0][ ivs[0] ],
-		    ambigMissType[curAmbigMiss], parAlleles[1][ ivs[1] ],
-		    (char) ('A' + ivs[0]), (char) ('A' + ivs[1]));
-	    iv >>= 2;
-	    ambigMiss >>= 2;
+	    fprintf(out, "%c,", status_indicator[status]);
 	  }
-	  // TODO: remove at some point
-	  if (prevM_OK >= 0) {
-	    uint8_t count = popcount(_phase[m].iv ^ _phase[prevM_OK].iv);
-	    if (_phase[m].numRecombs != count) {
-	      fprintf(out, " %2d!!!! ", count);
+	  if (p == 0)
+	    fprintf(out, ",");
+	}
+	fprintf(out, "0,\n");
+	break;
+      case PHASE_UNINFORM:
+	if (!sawPrevIV) {
+	  for (int p = 0; p < 2; p++) {
+	    for(int c = 0; c < numChildren; c++) {
+	      fprintf(out, "0,");
+	    }
+	    if (p == 0)
+	      fprintf(out, ",");
+	  }
+	  fprintf(out, "0,\n");
+	  break;
+	}
+	// else: fall through to PHASE_OK case to print <prevIV>
+	iv = prevIV;
+	numRecombs = 0;
+      case PHASE_OK:
+	for (int p = 0; p < 2; p++) {
+	  // If the marker is informative for p, print either 'A' or 'B'
+	  // otherwise print lowercase 'a' or 'b'
+	  char baseChar = 'a'; // initially
+	  if (status == PHASE_OK && (hetParent == 2 || hetParent == p))
+	    baseChar = 'A';
+
+	  for(int c = 0; c < numChildren; c++) {
+	    uint8_t curIV = (iv >> (2 * c + p)) & 1;
+	    uint8_t curAmbigMiss = (ambigMiss >> (2 * c)) & 3;
+	    uint8_t missing = curAmbigMiss & 1;
+	    uint8_t ambig = curAmbigMiss >> 1;
+
+	    // Note: 'a' + 1 == 'b' and 'A' + 1 == 'B' for ASCII chars
+	    char ivChar = (char) (baseChar + curIV);
+	    // Will print '0' if the child is missing data
+	    char printChar = missing * '0' + (1 - missing) * ivChar;
+	    // Will append a '?' if the child's IV is ambiguous
+	    fprintf(out, "%c%.*s,", printChar, ambig, "?");
+	  }
+	  if (p == 0)
+	    fprintf(out, ",");
+	}
+	fprintf(out, "%d,", numRecombs);
+	// print any ambiguous status values
+	if (status == PHASE_OK && //<ambigParHet> field only defined in PHASE_OK
+	    (_phase[m].ambigParPhase | _phase[m].ambigParHet)) {
+	  if (_phase[m].ambigParPhase) {
+	    if (_phase[m].hetParent == 2)
+	      fprintf(out, "S%d", _phase[m].ambigParPhase);
+	    else
+	      fprintf(out, "Swap");
+	    if (_phase[m].ambigParHet)
+	      fprintf(out, "_");
+	  }
+	  if (_phase[m].ambigParHet) {
+	    assert(_phase[m].ambigParHet >= 1 && _phase[m].ambigParHet <= 3);
+	    if (hetParent == 2) {
+	      if (_phase[m].ambigParHet == 1)
+		// Parent 1 can be het
+		fprintf(out, "HetPar1");
+	      else if (_phase[m].ambigParHet == 2)
+		fprintf(out, "HetPar0");
+	      else if (_phase[m].ambigParHet == 3)
+		fprintf(out, "HetPar0_1");
+	    }
+	    else { // heterozygous for one parent
+	      if (_phase[m].ambigParHet == 1)
+		fprintf(out, "HetPar%d", 1 - hetParent);
+	      else if (_phase[m].ambigParHet == 2)
+		fprintf(out, "HetPar2");
+	      else
+		fprintf(out, "HetPar%d_2", 1 - hetParent);
 	    }
 	  }
-	  fprintf(out, " %2d\n", _phase[m].numRecombs);
+	}
+	fprintf(out, "\n");
 
-	  // TODO: remove
-	  prevM_OK = m;
-	  break;
+	prevIV = iv;
+	sawPrevIV = true;
+	break;
 
-	default:
-	  fprintf(out, "ERROR: marker status %d\n", _phase[m].status);
-	  break;
-      }
+      case NUM_PHASE_STATUS:
+      default:
+	fprintf(out, "ERROR: marker status %d\n", _phase[m].status);
+	break;
     }
   }
 }
