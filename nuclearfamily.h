@@ -37,6 +37,8 @@ struct PhaseVals {
   // Each bit indicates presence or absence of different equal probability
   // <parentPhase> values
   uint8_t ambigParPhase; // Can fit in 4 bits
+  uint8_t arbitraryPar;  // Can fit in 1 bit
+  // TODO; either compress the above so they fit in 3 words or remove numRecombs
 };
 
 class NuclearFamily {
@@ -105,7 +107,7 @@ class NuclearFamily {
     void setPhase(int marker, uint64_t iv, uint64_t ambig, uint64_t missing,
 		  uint8_t parMissing, uint8_t hetParent, uint8_t homParentGeno,
 		  uint8_t parentPhase, uint8_t numRecombs, uint8_t ambigParHet,
-		  uint8_t ambigParPhase) {
+		  uint8_t ambigParPhase, uint8_t arbitraryPar) {
       _phase[marker].iv = iv;
       _phase[marker].ambigMiss = ambig | missing;
       _phase[marker].parentData = parMissing;
@@ -116,6 +118,7 @@ class NuclearFamily {
       _phase[marker].numRecombs = numRecombs;
       _phase[marker].ambigParHet = ambigParHet;
       _phase[marker].ambigParPhase = ambigParPhase;
+      _phase[marker].arbitraryPar = arbitraryPar;
     }
 
     const PhaseVals &getPhase(int marker) {

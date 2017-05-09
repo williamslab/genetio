@@ -148,7 +148,10 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 		parAlleles[0][0], ambigMissType[parMiss[0]], parAlleles[0][1],
 		markerType[hetParent],
 		parAlleles[1][0], ambigMissType[parMiss[1]], parAlleles[1][1]);
-	if (_phase[m].ambigParPhase | _phase[m].ambigParHet) {
+	if (_phase[m].ambigParPhase | _phase[m].ambigParHet |
+						      _phase[m].arbitraryPar) {
+	  if (_phase[m].arbitraryPar)
+	    fprintf(out, "P");
 	  if (_phase[m].ambigParPhase) {
 	    fprintf(out, "S");
 	    if (_phase[m].hetParent == 2)
