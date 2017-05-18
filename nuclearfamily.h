@@ -25,6 +25,9 @@ struct PhaseVals {
   // genotype data in PLINK bed format (2 bits per child) otherwise:
   uint64_t iv;
   uint64_t ambigMiss;
+  // For ambiguous states, which <iv> values differ among these states at the
+  // current marker
+  uint64_t ivFlippable;
   // Stores parent data for non-PHASE_OK. For PHASE_OK, indicates if missing
   uint8_t parentData;    // Can fit in 4 bits
   uint8_t hetParent;     // Can fit in 2 bits
@@ -105,11 +108,13 @@ class NuclearFamily {
     // <missing> should have the lower order bit set to 1 if the corresponding
     // child is missing data.
     void setPhase(int marker, uint64_t iv, uint64_t ambig, uint64_t missing,
-		  uint8_t parMissing, uint8_t hetParent, uint8_t homParentGeno,
-		  uint8_t parentPhase, uint8_t numRecombs, uint8_t ambigParHet,
+		  uint64_t ivFlippable, uint8_t parMissing, uint8_t hetParent,
+		  uint8_t homParentGeno, uint8_t parentPhase,
+		  uint8_t numRecombs, uint8_t ambigParHet,
 		  uint8_t ambigParPhase, uint8_t arbitraryPar) {
       _phase[marker].iv = iv;
       _phase[marker].ambigMiss = ambig | missing;
+      _phase[marker].ivFlippable = ivFlippable;
       _phase[marker].parentData = parMissing;
       _phase[marker].hetParent = hetParent;
       _phase[marker].homParentGeno = homParentGeno;

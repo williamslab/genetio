@@ -57,6 +57,7 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
   // TODO: better name?
   const char ambigMissType[4] = { '/', '_', '?', '!' };
   const char markerType[3] = { '0', '1', 'B' };
+  const char ivLabel[4] = { 'A', 'B', '?', '?' };
 
   const char *chrName = Marker::getChromName(chrIdx);
 
@@ -70,7 +71,7 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 
     PhaseStatus status = _phase[m].status;
     uint8_t parentData, hetParent, parentPhase;
-    uint64_t childrenData, iv, ambigMiss;
+    uint64_t childrenData, iv, ambigMiss, ivFlippable;
     char parAlleles[2][2];
     switch(status) {
       case PHASE_UNINFORM:
@@ -165,15 +166,26 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 
 	// now print children's haplotypes
 	iv = _phase[m].iv;
+	ivFlippable = _phase[m].ivFlippable;
 	ambigMiss = _phase[m].ambigMiss;
 	for(int c = 0; c < numChildren; c++) {
 	  uint8_t curIV = iv & 3;
+	  uint8_t curIVflip = ivFlippable & 3;
 	  uint8_t curAmbigMiss = ambigMiss & 3;
 	  int ivs[2] = { curIV & 1, curIV >> 1 };
+	  // IV letter is '?' if either parent is flippable
+	  // mechanically this happens by adding 2 to the index to <ivLabel>.
+	  // This occurs when different states yield minimum recombinant
+	  // haplotypes and differ in their inheritance vector values
+	  // TODO: better name for <ivLetters> and <ivLabel>
+	  // TODO: add to the IV output
+	  char curIVchars[2] = { ivLabel[ ivs[0] + ((curIVflip & 1) << 1) ],
+				 ivLabel[ ivs[1] + (curIVflip & 2) ] };
 	  fprintf(out, " %c%c%c %c%c", parAlleles[0][ ivs[0] ],
 		  ambigMissType[curAmbigMiss], parAlleles[1][ ivs[1] ],
-		  (char) ('A' + ivs[0]), (char) ('A' + ivs[1]));
+		  curIVchars[0], curIVchars[1]);
 	  iv >>= 2;
+	  ivFlippable >>= 2;
 	  ambigMiss >>= 2;
 	}
 	// TODO: remove at some point
@@ -236,10 +248,18 @@ void NuclearFamily::printIvCSV(FILE *out, int chrIdx) {
 
     PhaseStatus status = _phase[m].status;
     uint64_t iv = _phase[m].iv;
+    uint64_t ivFlippable = _phase[m].ivFlippable;
     uint64_t ambigMiss = _phase[m].ambigMiss;
     uint8_t hetParent = _phase[m].hetParent;
     uint8_t numRecombs = _phase[m].numRecombs;
     char status_indicator[NUM_PHASE_STATUS] = { '|', '|', '?', 'E', 'R' };
+    // Row indicates 0/1 whether the marker is informative
+    // Column indicates which haplotype was transmitted with '?' used for
+    // flippable <iv> values where ambiguities among states lead to varying
+    // haplotype transmissions and leave the true transmitted haplotype
+    // uncertain.
+    char ivLabel[2][4] = { { 'a', 'b', '?', '?' },
+			   { 'A', 'B', '?', '?' } };
     switch(status) {
       case PHASE_AMBIG:
       case PHASE_ERROR:
@@ -272,20 +292,21 @@ void NuclearFamily::printIvCSV(FILE *out, int chrIdx) {
 	for (int p = 0; p < 2; p++) {
 	  // If the marker is informative for p, print either 'A' or 'B'
 	  // otherwise print lowercase 'a' or 'b'
-	  char baseChar = 'a'; // initially
+	  int informative = 0;
 	  if (status == PHASE_OK && (hetParent == 2 || hetParent == p))
-	    baseChar = 'A';
+	    informative = 1;
 
 	  for(int c = 0; c < numChildren; c++) {
 	    uint8_t curIV = (iv >> (2 * c + p)) & 1;
+	    uint8_t curIVflip = (ivFlippable >> (2 * c + p)) & 1;
 	    uint8_t curAmbigMiss = (ambigMiss >> (2 * c)) & 3;
 	    uint8_t missing = curAmbigMiss & 1;
 	    uint8_t ambig = curAmbigMiss >> 1;
 
 	    // Note: 'a' + 1 == 'b' and 'A' + 1 == 'B' for ASCII chars
-	    char ivChar = (char) (baseChar + curIV);
+	    char curIVchar = ivLabel[informative][ curIV + 2 * curIVflip ];
 	    // Will print '0' if the child is missing data
-	    char printChar = missing * '0' + (1 - missing) * ivChar;
+	    char printChar = missing * '0' + (1 - missing) * curIVchar;
 	    // Will append a '?' if the child's IV is ambiguous
 	    fprintf(out, "%c%.*s,", printChar, ambig, "?");
 	  }
@@ -295,7 +316,11 @@ void NuclearFamily::printIvCSV(FILE *out, int chrIdx) {
 	fprintf(out, "%d,", numRecombs);
 	// print any ambiguous status values
 	if (status == PHASE_OK && //<ambigParHet> field only defined in PHASE_OK
-	    (_phase[m].ambigParPhase | _phase[m].ambigParHet)) {
+	    (_phase[m].ambigParPhase | _phase[m].ambigParHet |
+						      _phase[m].arbitraryPar)) {
+	  if (_phase[m].arbitraryPar) {
+	    fprintf(out, "ParArbitrary");
+	  }
 	  if (_phase[m].ambigParPhase) {
 	    if (_phase[m].hetParent == 2)
 	      fprintf(out, "S%d", _phase[m].ambigParPhase);
