@@ -1325,7 +1325,7 @@ void PersonIO<P>::readPlinkBedBulk(FILE *in, FILE *outs[2]) {
   int &bytesPerMarker = *bytesPerMarkerPtr;
   uint8_t *&data = *dataPtr;
 
-  static_assert(sizeof(uint8_t) == 1);
+  static_assert(sizeof(uint8_t) == 1, "expect 8 bits to be 1 byte");
   bytesPerMarker = std::ceil( ((float) numIndivs * 2) / 8 );
   uint64_t allocBytes = (uint64_t) bytesPerMarker * numMarkers;
   data = new uint8_t[ allocBytes ];
