@@ -651,8 +651,12 @@ void PersonIO<P>::parsePedGenotypes(FILE *in, P *thePerson) {
   // Which bit/locus within the chunk are we on?
   int curChunkIdx = 0;
 
-  // Which marker number does the next genotype correspond to?
+  // Which marker number does the next genotype correspond to? This is relative
+  // to stored markers (we omit some that are not stored)
   int curMarkerIdx = 0;
+  // Which marker number does the next genotype correspond got? This includes
+  // omitted markers
+  int curReadMarkrIdx = 0;
   // What marker index on the chromosome does the next genotype correspond to?
   int chromMarkerIdx = 0;
   // Which chromosome index are we currently on?
@@ -665,13 +669,13 @@ void PersonIO<P>::parsePedGenotypes(FILE *in, P *thePerson) {
 //  int alleleCount;    // init'd below
 //  int totalGenotypes;
 
-  int numMarkersToRead = Marker::getNumMarkers();
+  int numMarkersToStore = Marker::getNumMarkers();
 
   const dynarray<int> &omitMarkers = Marker::getMarkersToOmit();
   int omitIdx = 0;
   int nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
 
-  for( ; curMarkerIdx < numMarkersToRead; curMarkerIdx++) {
+  for( ; curMarkerIdx < numMarkersToStore; curMarkerIdx++, curReadMarkrIdx++) {
     char allele[2];
 
     for(int a = 0; a < 2; a++) {
@@ -683,7 +687,7 @@ void PersonIO<P>::parsePedGenotypes(FILE *in, P *thePerson) {
       }
     }
 
-    if (curMarkerIdx == nextToOmitIdx) {
+    if (curReadMarkrIdx == nextToOmitIdx) {
       // skip this marker
       omitIdx++;
       nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
@@ -980,6 +984,7 @@ void PersonIO<P>::parsePackedGenotypes(FILE *in, int recordLen, char *buf,
 
   // read in but don't store genotypes for markers that should be skipped
   // because we're only analyzing one chromosome:
+  // TODO: can speed up by just fseek()'ing
   for(int i = 0; i < Marker::getFirstStoredMarkerFileIdx(); i++) {
     ret = fread(buf, recordLen, sizeof(char), in);
     if (ret == 0) {
@@ -994,8 +999,12 @@ void PersonIO<P>::parsePackedGenotypes(FILE *in, int recordLen, char *buf,
   // Which bit/locus within the chunk are we on?
   int curChunkIdx = 0;
 
-  // Which marker number does the data correspond to?
+  // Which marker number does the next genotype correspond to? This is relative
+  // to stored markers (we omit some that are not stored)
   int curMarkerIdx = 0;
+  // Which marker number does the next genotype correspond got? This includes
+  // omitted markers
+  int curReadMarkrIdx = 0;
   // What marker index on the chromosome does the next genotype correspond to?
   int chromMarkerIdx = 0;
   // Which chromosome index are we currently on?
@@ -1005,20 +1014,20 @@ void PersonIO<P>::parsePackedGenotypes(FILE *in, int recordLen, char *buf,
   int alleleCount = 0;
   int totalGenotypes = 0;
 
-  int numMarkersToRead = Marker::getNumMarkers();
+  int numMarkersToStore = Marker::getNumMarkers();
 
   const dynarray<int> &omitMarkers = Marker::getMarkersToOmit();
   int omitIdx = 0;
   int nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
 
-  for( ; curMarkerIdx < numMarkersToRead; curMarkerIdx++) {
+  for( ; curMarkerIdx < numMarkersToStore; curMarkerIdx++, curReadMarkrIdx++) {
     ret = fread(buf, recordLen, sizeof(char), in);
     if (ret == 0) {
       fprintf(stderr, "\nERROR reading from geno file\n");
       exit(1);
     }
 
-    if (curMarkerIdx == nextToOmitIdx) {
+    if (curReadMarkrIdx == nextToOmitIdx) { // TODO: fseek(): omit fread() above
       // skip this marker
       omitIdx++;
       nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
@@ -1154,7 +1163,11 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in, bool phased) {
   // Which marker number does the data correspond to?  The genotype file has
   // one marker per line, so this value gets incremented every time we encounter
   // a newline
+  // This is relative to stored markers (we omit some that are not stored)
   int curMarkerIdx = 0;
+  // Which marker number does the next genotype correspond got? This includes
+  // omitted markers
+  int curReadMarkrIdx = 0;
   // What marker index on the chromosome does the next genotype correspond to?
   int chromMarkerIdx = 0;
   // Which chromosome index are we currently on?
@@ -1164,13 +1177,13 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in, bool phased) {
   int alleleCount;    // init'd below
   int totalGenotypes;
 
-  int numMarkersToRead = Marker::getNumMarkers();
+  int numMarkersToStore = Marker::getNumMarkers();
 
   const dynarray<int> &omitMarkers = Marker::getMarkersToOmit();
   int omitIdx = 0;
   int nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
 
-  for( ; curMarkerIdx < numMarkersToRead; curMarkerIdx++) {
+  for( ; curMarkerIdx < numMarkersToStore; curMarkerIdx++, curReadMarkrIdx++) {
     ret = fread(buf, bufSize+1, sizeof(char), in);
     assert(buf[bufSize] == '\n'); // should have endline here
     if (ret == 0) {
@@ -1178,7 +1191,7 @@ void PersonIO<P>::parseEigenstratFormat(FILE *in, bool phased) {
       exit(1);
     }
 
-    if (curMarkerIdx == nextToOmitIdx) {
+    if (curReadMarkrIdx == nextToOmitIdx) {
       // skip this marker
       omitIdx++;
       nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
@@ -1318,7 +1331,7 @@ void PersonIO<P>::readPlinkBedBulk(FILE *in, FILE *outs[2]) {
   }
 
   int numIndivs = P::_allIndivs.length();
-  int numMarkers = Marker::getNumMarkers();
+  int numMarkersToStore = Marker::getNumMarkers();
 
   // Take away one level of dereferencing to make the math and whatnot simpler
   // below
@@ -1326,11 +1339,33 @@ void PersonIO<P>::readPlinkBedBulk(FILE *in, FILE *outs[2]) {
   uint8_t *&data = *dataPtr;
 
   static_assert(sizeof(uint8_t) == 1, "expect 8 bits to be 1 byte");
-  bytesPerMarker = std::ceil( ((float) numIndivs * 2) / 8 );
-  uint64_t allocBytes = (uint64_t) bytesPerMarker * numMarkers;
+  bytesPerMarker = std::ceil( ((float) numIndivs * 2) / (8 * sizeof(char)) );
+  uint64_t allocBytes = (uint64_t) bytesPerMarker * numMarkersToStore;
   data = new uint8_t[ allocBytes ];
 
-  for(int m = 0; m < numMarkers; m++) {
+  // When skipping some initial SNPs (such as when reading a specific
+  // chromosome), seek to the proper position in the file
+  fseek(in, bytesPerMarker * Marker::getFirstStoredMarkerFileIdx(), SEEK_CUR);
+
+  const dynarray<int> &omitMarkers = Marker::getMarkersToOmit();
+  int omitIdx = 0;
+  int nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
+
+  // <m> is the index of the stored marker, <readMrkr> is the index of the
+  // markers read (actually we fseek() past omitted markers, but the count
+  // includes all markers scanned through)
+  for(int m = 0, readMrkr = 0; m < numMarkersToStore; m++, readMrkr++) {
+    if (readMrkr == nextToOmitIdx) {
+      // skip this marker
+      omitIdx++;
+      nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
+      fseek(in, bytesPerMarker, SEEK_CUR);
+      // must decrement m since this index *is* used in the markers that are
+      // stored
+      m--;
+      continue;
+    }
+
     uint32_t index = m * bytesPerMarker;
     int ret = fread(&data[index], bytesPerMarker, sizeof(uint8_t), in);
     if (ret == 0) {
@@ -1369,8 +1404,12 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
   // Which bit/locus within the chunk are we on?
   int curChunkIdx = 0;
 
-  // Which marker number does the data correspond to?
+  // Which marker number does the next genotype correspond to? This is relative
+  // to stored markers (we omit some that are not stored)
   int curMarkerIdx = 0;
+  // Which marker number does the next genotype correspond got? This includes
+  // omitted markers
+  int curReadMarkrIdx = 0;
   // What marker index on the chromosome does the next genotype correspond to?
   int chromMarkerIdx = 0;
   // Which chromosome index are we currently on?
@@ -1381,7 +1420,7 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
   int totalGenotypes;
   bool nonStandardGeno; // any genotypes besides 0 and 1? Can't calculate AF
 
-  int numMarkersToRead = Marker::getNumMarkers();
+  int numMarkersToStore = Marker::getNumMarkers();
 
   // TODO: should we delete this dynarray in Marker?
   const dynarray<int> &omitMarkers = Marker::getMarkersToOmit();
@@ -1390,11 +1429,12 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
 
   // Start parsing the VCF using HTSlib; gives one line at a time:
   // Go through all the lines in the query region
-  for ( ; tbx_itr_next(vcfIn, index, itr, &vcfIn->line) >= 0; curMarkerIdx++) {
-    assert(curMarkerIdx < numMarkersToRead);
+  for ( ; tbx_itr_next(vcfIn, index, itr, &vcfIn->line) >= 0;
+					    curMarkerIdx++, curReadMarkrIdx++) {
+    assert(curMarkerIdx < numMarkersToStore);
     // string for the current line is in vcfIn->line.s
 
-    if (curMarkerIdx == nextToOmitIdx) {
+    if (curReadMarkrIdx == nextToOmitIdx) {
       // skip this marker
       omitIdx++;
       nextToOmitIdx =(omitMarkers.length()>omitIdx) ? omitMarkers[omitIdx] : -1;
