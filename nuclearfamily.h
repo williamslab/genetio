@@ -84,9 +84,22 @@ class NuclearFamily {
     static fam_ht_iter familyIterEnd() { return _families.end(); }
     static fam_ht::size_type numFamilies() { return _families.size(); }
 
+    // not needed -- only delete when program done: OS will manage
+//    static void cleanUp() {
+//      for(fam_ht_iter it = _families.begin(); it != _families.end(); it++) {
+//	delete it->first;
+//	delete it->second;
+//      }
+//    }
+
     //////////////////////////////////////////////////////////////////
     // public methods
     //////////////////////////////////////////////////////////////////
+
+    // not needed -- only delete when program done: OS will manage
+//    ~NuclearFamily() {
+//      delete [] _phase;
+//    }
 
     int numChildren() { return _children.length(); }
     void initFam() { _phase = new PhaseVals[ Marker::getNumMarkers() ]; }

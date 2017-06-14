@@ -830,6 +830,11 @@ void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
 			     familyIdLength);
 	  // note: person is not in _allIndivs, but that's OK: he/she only
 	  // exists so we can link others with data together in families
+	  // the above means that if we do comment out/use the
+	  // PersonIO::cleanUp() method, there will be a memory leak due to
+	  // this statement. As in other cases, this really isn't a leak because
+	  // we want to retain this information until the program end, so the OS
+	  // will take care of reclaiming the memory when the time is right.
 	}
 	else {
 	  for(int o = 0; o < 2; o++) {
