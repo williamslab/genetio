@@ -158,8 +158,33 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	    if (_phase[m].hetParent == 2)
 	      fprintf(out, "%d", _phase[m].ambigParPhase);
 	  }
-	  if (_phase[m].ambigParHet)
-	    fprintf(out, "H%d", _phase[m].ambigParHet);
+	  if (_phase[m].ambigParHet) {
+	    switch (_phase[m].ambigParHet) {
+	      case 1:
+		fprintf(out, "H0");
+		break;
+	      case 2:
+		fprintf(out, "H1");
+		break;
+	      case 3:
+		fprintf(out, "H01");
+		break;
+	      case 4:
+		fprintf(out, "H2");
+		break;
+	      case 5:
+		fprintf(out, "H02");
+		break;
+	      case 6:
+		fprintf(out, "H12");
+		break;
+
+	      default:
+		fprintf(out, "ERROR: ambigParHet status %d\n",
+			_phase[m].ambigParHet);
+		break;
+	    }
+	  }
 	}
 	else
 	  fprintf(out, "|");

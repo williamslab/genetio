@@ -36,7 +36,7 @@ struct PhaseVals {
   PhaseStatus status;    // Can fit in 2 bits
   // TODO: recalculate this when needed?
   uint8_t numRecombs;    // Since previous marker
-  uint8_t ambigParHet;   // Can fit in 1 bit
+  uint8_t ambigParHet;   // Can fit in 3 bit
   // Each bit indicates presence or absence of different equal probability
   // <parentPhase> values
   uint8_t ambigParPhase; // Can fit in 4 bits
