@@ -98,11 +98,12 @@ class NuclearFamily {
 
     // not needed -- only delete when program done: OS will manage
 //    ~NuclearFamily() {
-//      delete [] _phase;
+//      if (_phase)  delete [] _phase;
 //    }
 
     int numChildren() { return _children.length(); }
-    void initFam() { _phase = new PhaseVals[ Marker::getNumMarkers() ]; }
+    void initPhase() { _phase = new PhaseVals[ Marker::getNumMarkers() ]; }
+    void deletePhase() { delete [] _phase; _phase = NULL; }
 
     // As below, <missing> should have the lower order bit for each child that
     // is missing set to 1.
