@@ -31,7 +31,14 @@ struct PhaseVals {
   // Stores parent data for non-PHASE_OK. For PHASE_OK, indicates if missing
   uint8_t parentData;    // Can fit in 4 bits
   uint8_t hetParent;     // Can fit in 2 bits
+  // For PHASE_UNINFORM, when one or both parents are missing data and we can
+  // impute the missing parent(s)'s homozygous genotypes, the following is that
+  // genotype:
   uint8_t homParentGeno; // Can fit in 2 bits
+  // For PHASE_UNINFORM, for the imputation procedure, we determine which
+  // parent haplotypes were untransmitted; the data are ambiguous as to the
+  // genotype of any such haplotypes, and so we don't impute those alleles
+  uint8_t untransParHap; // Can fit in 4 bits
   uint8_t parentPhase;   // Can fit in 2 bits
   PhaseStatus status;    // Can fit in 2 bits
   // TODO: recalculate this when needed?
@@ -109,12 +116,25 @@ class NuclearFamily {
     // is missing set to 1.
     void setStatus(int marker, PhaseStatus status, uint8_t parentData,
 		   uint64_t childrenData, uint64_t missing) {
-      // should only use this method to set bad status
-      assert(status != PHASE_OK);
+      // should only use this method to set status besides PHASE_OK and
+      // PHASE_UNINFORM
+      assert(status != PHASE_OK && status != PHASE_UNINFORM);
       _phase[marker].iv = childrenData;
       _phase[marker].ambigMiss = missing;
       _phase[marker].parentData = parentData;
       _phase[marker].status = status;
+    }
+
+    // For setting a marker's phase status to be uninformative; we require a
+    // value for <homParentGeno> which is used for imputing the genotypes of
+    // the parents when one or both are missing data
+    void setUninform(int marker, uint8_t parentData, uint64_t childrenData,
+		     uint64_t missing, uint8_t homParentGeno) {
+      _phase[marker].iv = childrenData;
+      _phase[marker].ambigMiss = missing;
+      _phase[marker].parentData = parentData;
+      _phase[marker].homParentGeno = homParentGeno;
+      _phase[marker].status = PHASE_UNINFORM;
     }
 
     // <ambig> should have the higher order bit (of the two bits allotted each
@@ -138,6 +158,14 @@ class NuclearFamily {
       _phase[marker].ambigParHet = ambigParHet;
       _phase[marker].ambigParPhase = ambigParPhase;
       _phase[marker].arbitraryPar = arbitraryPar;
+    }
+
+    // Sets the <untransParHap> field in <_phase[marker]>. This indicates which
+    // parent haplotypes were transmitted to the children at the corresponding
+    // marker. This used to help impute the parent(s)'s genotypes at
+    // uninformative markers.
+    void setUntransPar(int marker, uint8_t untransParHap) {
+      _phase[marker].untransParHap = untransParHap;
     }
 
     const PhaseVals &getPhase(int marker) {
@@ -169,19 +197,27 @@ class NuclearFamily {
     // private methods
     //////////////////////////////////////////////////////////////////
 
-    void printGeno(FILE *out, const char *alleles, uint8_t genotype) {
+    // alleles is expected to contain in elements 0 and 2 the two alleles for
+    // this marker (single characters) and in element 1, a '0' character. The
+    // latter enables for indicating that the allele is unknown when the parent
+    // did not transmit a potentially imputed allele.
+    void printGeno(FILE *out, const char *alleles, uint8_t genotype,
+		   char sep = '/', uint8_t untrans = 0) {
       switch(genotype) {
 	case G_HOM0:
-	  fprintf(out, "%c/%c", alleles[0], alleles[0]);
+	  fprintf(out, "%c%c%c", alleles[untrans & 1], sep,
+		  alleles[(untrans & 2) >> 1]);
 	  break;
 	case G_MISS:
-	  fprintf(out, "0/0");
+	  fprintf(out, "0%c0", sep);
 	  break;
 	case G_HET:
-	  fprintf(out, "%c/%c", alleles[0], alleles[2]);
+	  fprintf(out, "%c%c%c", alleles[untrans & 1], sep,
+		  alleles[2 - ((untrans & 2) >> 1)]);
 	  break;
 	case G_HOM1:
-	  fprintf(out, "%c/%c", alleles[2], alleles[2]);
+	  fprintf(out, "%c%c%c", alleles[2 - (untrans & 1)], sep,
+		  alleles[2 - ((untrans & 2) >> 1)]);
 	  break;
       }
     }

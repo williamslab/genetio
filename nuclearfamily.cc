@@ -57,7 +57,7 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
   // TODO: better name?
   const char ambigMissType[4] = { '/', '_', '?', '!' };
   const char markerType[3] = { '0', '1', 'B' };
-  const char ivLabel[4] = { 'A', 'B', '?', '?' };
+  const char ivLabel[4] = { 'A', 'B', 'a', 'b' };
 
   const char *chrName = Marker::getChromName(chrIdx);
 
@@ -65,16 +65,24 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
   int firstMarker = Marker::getFirstMarkerNum(chrIdx);
   int lastMarker = Marker::getLastMarkerNum(chrIdx);
   for(int m = firstMarker; m <= lastMarker; m++) {
-    const char *alleles = Marker::getMarker(m)->getAlleleStr();
+    const char *theAlleles = Marker::getMarker(m)->getAlleleStr();
+    // For use with the printGeno() method: allows printing an unknown genotype
+    // for untransmitted alleles at positions where we attempt to impute the
+    // parents' genotype: alleles[1] is '0' or unknown.
+    char alleles[3] = { theAlleles[0], '0', theAlleles[2] };
 
     fprintf(out, "%-2s %-5d ", chrName, m - firstMarker);
 
     PhaseStatus status = _phase[m].status;
-    uint8_t parentData, hetParent, parentPhase;
+    uint8_t parentData, hetParent, parentPhase, untrans;
     uint64_t childrenData, iv, ambigMiss, ivFlippable;
+    uint8_t imputeParGeno = G_MISS; // by default no imputation
     char parAlleles[2][2];
     switch(status) {
       case PHASE_UNINFORM:
+	// can impute at uninformative markers, not the others, using the
+	// <homParentGeno> field:
+	imputeParGeno = _phase[m].homParentGeno;
       case PHASE_AMBIG:
       case PHASE_ERROR:
       case PHASE_ERR_RECOMB:
@@ -83,9 +91,24 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 
 	// print the parent's genotypes
 	parentData = _phase[m].parentData;
-	printGeno(out, alleles, parentData & 3);
-	fprintf(out, "   ");
-	printGeno(out, alleles, parentData >> 2);
+	untrans = _phase[m].untransParHap;
+	for(int p = 0; p < 2; p++) {
+	  uint8_t thisParGeno = parentData & 3;
+	  uint8_t thisUntrans = untrans & 3;
+	  // <isMissing> is 1 iff thisParGeno == 1:
+	  uint8_t isMissing = (thisParGeno & 1) & ~(thisParGeno >> 1);
+	  // Will print either the parent genotype if it is not missing or
+	  // the imputed genotype if it is missing (note that the default is
+	  // for <imputeParGeno> is missing as well:
+	  uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
+					      isMissing * imputeParGeno;
+	  printGeno(out, alleles, genoToPrint, ambigMissType[ isMissing ],
+		    isMissing * thisUntrans);
+	  parentData >>= 2;
+	  untrans >>= 2;
+	  if (p == 0)
+	    fprintf(out, "   ");
+	}
 	switch(status) {
 	  case PHASE_UNINFORM:
 	    fprintf(out, " |");
