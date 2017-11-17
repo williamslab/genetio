@@ -39,6 +39,12 @@ struct PhaseVals {
   // parent haplotypes were untransmitted; the data are ambiguous as to the
   // genotype of any such haplotypes, and so we don't impute those alleles
   uint8_t untransParHap; // Can fit in 4 bits
+  // For PHASE_UNINFORM, both parents are homozygous, so when a child is
+  // heterozygous, it is possible to use one (or both) of the parent's
+  // genotypes to deduce what the phase of heterozygous children is.
+  // If <uninfHetSwap> == 0, the default print order for heterozygous genotypes
+  // gives the correct phase, otherwise this should be swapped.
+  uint8_t uninfHetSwap;  // Can fit in 1 bit
   uint8_t parentPhase;   // Can fit in 2 bits
   PhaseStatus status;    // Can fit in 2 bits
   // TODO: recalculate this when needed?
@@ -129,11 +135,13 @@ class NuclearFamily {
     // value for <homParentGeno> which is used for imputing the genotypes of
     // the parents when one or both are missing data
     void setUninform(int marker, uint8_t parentData, uint64_t childrenData,
-		     uint64_t missing, uint8_t homParentGeno) {
+		     uint64_t missing, uint8_t homParentGeno,
+		     uint8_t uninfHetSwap) {
       _phase[marker].iv = childrenData;
       _phase[marker].ambigMiss = missing;
       _phase[marker].parentData = parentData;
       _phase[marker].homParentGeno = homParentGeno;
+      _phase[marker].uninfHetSwap = uninfHetSwap;
       _phase[marker].status = PHASE_UNINFORM;
     }
 
@@ -173,6 +181,7 @@ class NuclearFamily {
     }
 
     void printHapTxt(FILE *out, int chrIdx);
+    void printPhasedPed(FILE *out);
     void printIvCSV(FILE *out, int chrIdx);
 
     //////////////////////////////////////////////////////////////////
@@ -197,12 +206,14 @@ class NuclearFamily {
     // private methods
     //////////////////////////////////////////////////////////////////
 
+    void printOnePedHap(FILE *out, int p, int c);
+
     // alleles is expected to contain in elements 0 and 2 the two alleles for
     // this marker (single characters) and in element 1, a '0' character. The
     // latter enables for indicating that the allele is unknown when the parent
     // did not transmit a potentially imputed allele.
     void printGeno(FILE *out, const char *alleles, uint8_t genotype,
-		   char sep = '/', uint8_t untrans = 0) {
+		   char sep = '/', uint8_t untrans = 0, uint8_t swapHet = 0) {
       switch(genotype) {
 	case G_HOM0:
 	  fprintf(out, "%c%c%c", alleles[untrans & 1], sep,
@@ -212,8 +223,14 @@ class NuclearFamily {
 	  fprintf(out, "0%c0", sep);
 	  break;
 	case G_HET:
-	  fprintf(out, "%c%c%c", alleles[untrans & 1], sep,
-		  alleles[2 - ((untrans & 2) >> 1)]);
+	  // if <swapHet> == 0:
+//	  fprintf(out, "%c%c%c", alleles[untrans & 1], sep,
+//		  alleles[2 - ((untrans & 2) >> 1)]);
+	  {
+	    int idxs[2] = { (untrans & 1) + (1 - untrans) * swapHet * 2,
+			  (untrans & 1) + (1 - untrans) * (1 - swapHet) * 2 };
+	    fprintf(out, "%c%c%c", alleles[ idxs[0] ], sep, alleles[ idxs[1] ]);
+	  }
 	  break;
 	case G_HOM1:
 	  fprintf(out, "%c%c%c", alleles[2 - (untrans & 1)], sep,
@@ -223,7 +240,7 @@ class NuclearFamily {
     }
 
     //////////////////////////////////////////////////////////////////
-    // public variables
+    // private variables
     //////////////////////////////////////////////////////////////////
 
     // Stores phase for the family in the same format as used to phase it

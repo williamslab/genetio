@@ -99,7 +99,7 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	  uint8_t isMissing = (thisParGeno & 1) & ~(thisParGeno >> 1);
 	  // Will print either the parent genotype if it is not missing or
 	  // the imputed genotype if it is missing (note that the default is
-	  // for <imputeParGeno> is missing as well:
+	  // for <imputeParGeno> is missing as well):
 	  uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
 					      isMissing * imputeParGeno;
 	  printGeno(out, alleles, genoToPrint, ambigMissType[ isMissing ],
@@ -131,7 +131,8 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	childrenData = _phase[m].iv;
 	for(int c = 0; c < numChildren; c++) {
 	  fprintf(out, " ");
-	  printGeno(out, alleles, childrenData & 3);
+	  printGeno(out, alleles, childrenData & 3, /*sep=*/ '/',
+		    /*untrans=NA=*/ 0, /*swapHet=*/ _phase[m].uninfHetSwap);
 	  fprintf(out, "   ");
 	  childrenData >>= 2;
 	}
@@ -250,11 +251,189 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	break;
 
       default:
-	fprintf(out, "ERROR: marker status %d\n", _phase[m].status);
+	fprintf(stderr, "ERROR: marker status %d\n", _phase[m].status);
+	exit(1);
 	break;
     }
   }
 }
+
+// Prints the haplotypes for <this> nuclear family to <out> in PLINK ped format
+void NuclearFamily::printPhasedPed(FILE *out) {
+  int famIdLen = _parents->first->getFamilyIdLength();
+
+  // print the dad:
+  fprintf(out, "%s\t%s\t0\t0\t%c\t0",
+	  (famIdLen == 0) ? "0" : _parents->first->getId(),
+	  &_parents->first->getId()[famIdLen+1], '1');
+  printOnePedHap(out, /*p=*/0, /*c=*/-1);
+
+  // print the mom:
+  fprintf(out, "%s\t%s\t0\t0\t%c\t0",
+	  (famIdLen == 0) ? "0" : _parents->second->getId(),
+	  &_parents->second->getId()[famIdLen+1], '2');
+  printOnePedHap(out, /*p=*/1, /*c=*/-1);
+
+  // print the children:
+  int numChildren = _children.length();
+  for(int c = 0; c < numChildren; c++) {
+    fprintf(out, "%s\t%s\t%s\t%s\t%c\t0",
+	    (famIdLen == 0) ? "0" : _children[c]->getId(),
+	    &_children[c]->getId()[famIdLen+1],
+	    &_parents->first->getId()[famIdLen+1],
+	    &_parents->second->getId()[famIdLen+1],
+	    (_children[c]->getSex() == 'M') ? '1' : '2');
+    printOnePedHap(out, /*p=*/-1, /*c=*/c);
+  }
+}
+
+// Print the genotypes for a given parent <p> (0 or 1) or a given child <c> in
+// PLINK ped format, terminating with an endline character.
+void NuclearFamily::printOnePedHap(FILE *out, int p, int c) {
+  assert(p < 0 || c < 0); // can only process one person, a parent or child
+
+  int numMarkers = Marker::getNumMarkers();
+  for(int m = 0; m < numMarkers; m++) {
+    const char *theAlleles = Marker::getMarker(m)->getAlleleStr();
+    // For use with the printGeno() method: allows printing an unknown genotype
+    // for untransmitted alleles at positions where we attempt to impute the
+    // parents' genotype: alleles[1] is '0' or unknown.
+    char alleles[3] = { theAlleles[0], '0', theAlleles[2] };
+
+    PhaseStatus status = _phase[m].status;
+    switch(status) {
+      case PHASE_AMBIG:
+      case PHASE_ERROR:
+      case PHASE_ERR_RECOMB:
+	// not phased -- code as missing
+	fprintf(out, "\t0\t0");
+	break;
+
+      case PHASE_UNINFORM:
+	{
+	  // can impute at uninformative markers, not the others, using the
+	  // <homParentGeno> field:
+	  uint8_t imputeParGeno = _phase[m].homParentGeno;
+
+	  if (p >= 0) {
+	    // print the parent's genotypes (which are homozygous so phased)
+	    uint8_t parentData = _phase[m].parentData;
+	    uint8_t untrans = _phase[m].untransParHap;
+
+	    // must shift by 2 bits to get data for p == 1:
+	    uint8_t thisParGeno = (parentData >> (2*p)) & 3;
+	    uint8_t thisUntrans = (untrans >> (2*p)) & 3;
+	    // <isMissing> is 1 iff thisParGeno == 1:
+	    uint8_t isMissing = (thisParGeno & 1) & ~(thisParGeno >> 1);
+	    // Will print either the parent genotype if it is not missing or
+	    // the imputed genotype if it is missing (note that the default is
+	    // for <imputeParGeno> is missing as well):
+	    uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
+					      isMissing * imputeParGeno;
+	    fprintf(out, "\t");
+	    printGeno(out, alleles, genoToPrint, /*sep=*/ '\t',
+		      isMissing * thisUntrans);
+	  }
+	  else {
+	    // print child's haplotype
+	    // must shift by 2*c bits to get this child's data:
+	    uint8_t childGeno = (_phase[m].iv >> (2*c)) & 3;
+	    fprintf(out, "\t");
+	    printGeno(out, alleles, childGeno, /*sep=*/ '\t',
+		      /*untrans=NA=*/ 0, /*swapHet=*/ _phase[m].uninfHetSwap);
+	  }
+	}
+	break;
+
+      case PHASE_OK:
+	{
+	  /////////////////////////////////////////////////////////////////////
+	  // Standard phased marker
+
+	  // Note about ambiguities:
+	  // - arbitraryPar: which parent is which was chosen arbitarily. This
+	  //   can only occur when neither parent has data. We'll just print the
+	  //   phase as is, and note that if this happens internally, it can
+	  //   lead to a switch error in which the parent's haplotypes get mixed
+	  //   up with each other.
+	  // - ambigParPhase: the parent's phase is potentially swappable. We'll
+	  //   print the arbitrarily chosen phase here without warning
+	  // - ambigParHet: which parent is heterozygous is ambiguous. We won't
+	  //   print any haplotypes (print missing data instead).
+	  // - ivFlippable: happens when different states yield minimum
+	  //   recombinant haplotypes and differ in their inheritance vector
+	  //   values. We'll stick withthe convention adopted throughout these
+	  //   ambiguities of choosing a phase arbitrarily among the
+	  //   possibilities, and will therefore print the values corresponding
+	  //   to the state stored here.
+	  // - ambigMiss: samples that are ambiguous (or both ambiguous and
+	  //   missing) do not have their haplotypes printed (print missing data
+	  //   instead).
+
+	  // first determine which alleles each parent has on each haplotype;
+	  // Note that the <alleles> string has alleles at index 0 and 2
+	  uint8_t hetParent = _phase[m].hetParent;
+	  uint8_t parentPhase = _phase[m].parentPhase;
+	  char parAlleles[2][2];
+	  if (hetParent == 0 || hetParent == 1) {
+	    int ind0 = 0 * (1 - parentPhase) + 2 * parentPhase;
+	    parAlleles[hetParent][0] = alleles[ind0];
+	    parAlleles[hetParent][1] = alleles[ 2 - ind0 ];
+	    assert(_phase[m].homParentGeno != G_MISS);
+	    parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] =
+				   alleles[ (_phase[m].homParentGeno / 3) * 2 ];
+	  }
+	  else {
+	    assert(hetParent == 2);
+	    int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
+			  0 * (1 - (parentPhase >> 1)) + 2*(parentPhase >> 1) };
+	    for(int p = 0; p < 2; p++) {
+	      parAlleles[p][0] = alleles[ ind0[p] ];
+	      parAlleles[p][1] = alleles[ 2 - ind0[p] ];
+	    }
+	  }
+
+	  if (p >= 0) {
+	    if (_phase[m].ambigParHet) {
+	      // unclear which parent is heterozygous
+	      // will show parents as missing
+	      fprintf(out, "\t0\t0");
+	    }
+	    else {
+	      // print parent's haplotypes
+	      fprintf(out, "\t%c\t%c",
+		      parAlleles[p][0], parAlleles[p][1]);
+	    }
+	  }
+	  else {
+	    // print child's haplotype
+	    // must shift by 2*c bits to get this child's data:
+	    uint8_t curIV = (_phase[m].iv >> (2*c)) & 3;
+	    int ivs[2] = { curIV & 1, curIV >> 1 };
+
+	    uint8_t curAmbigMiss = (_phase[m].ambigMiss >> (2*c)) & 3;
+	    if (_phase[m].ambigParHet || curAmbigMiss >= 2) {
+	      // Either which parent is heterozygous is unknown or
+	      // child's phase is ambiguous: print missing
+	      fprintf(out, "\t0\t0");
+	    }
+	    else {
+	      fprintf(out, "\t%c\t%c", parAlleles[0][ ivs[0] ],
+		      parAlleles[1][ ivs[1] ]);
+	    }
+	  }
+	}
+	break;
+
+      default:
+	fprintf(stderr, "ERROR: marker status %d\n", _phase[m].status);
+	exit(1);
+	break;
+    }
+  }
+  fprintf(out, "\n");
+}
+
 
 void NuclearFamily::printIvCSV(FILE *out, int chrIdx) {
   int numChildren = _children.length();
