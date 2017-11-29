@@ -182,6 +182,7 @@ class NuclearFamily {
 
     void printHapTxt(FILE *out, int chrIdx);
     void printPhasedPed(FILE *out);
+    void printPhasedVCF(FILE *out, const char *progamName);
     void printIvCSV(FILE *out, int chrIdx);
 
     //////////////////////////////////////////////////////////////////
@@ -209,9 +210,10 @@ class NuclearFamily {
     void printOnePedHap(FILE *out, int p, int c);
 
     // alleles is expected to contain in elements 0 and 2 the two alleles for
-    // this marker (single characters) and in element 1, a '0' character. The
-    // latter enables for indicating that the allele is unknown when the parent
-    // did not transmit a potentially imputed allele.
+    // this marker (single characters) and in element 1, a missing data
+    // character (such as '0'). The latter enables for indicating that the
+    // allele is unknown when the parent did not transmit a potentially imputed
+    // allele.
     void printGeno(FILE *out, const char *alleles, uint8_t genotype,
 		   char sep = '/', uint8_t untrans = 0, uint8_t swapHet = 0) {
       switch(genotype) {
@@ -220,7 +222,7 @@ class NuclearFamily {
 		  alleles[(untrans & 2) >> 1]);
 	  break;
 	case G_MISS:
-	  fprintf(out, "0%c0", sep);
+	  fprintf(out, "%c%c%c", alleles[1], sep, alleles[1]);
 	  break;
 	case G_HET:
 	  // if <swapHet> == 0:
