@@ -734,23 +734,30 @@ void NuclearFamily::printIvCSV(FILE *out, int chrIdx) {
 	      fprintf(out, "_");
 	  }
 	  if (_phase[m].ambigParHet) {
-	    assert(_phase[m].ambigParHet >= 1 && _phase[m].ambigParHet <= 3);
-	    if (hetParent == 2) {
-	      if (_phase[m].ambigParHet == 1)
-		// Parent 1 can be het
-		fprintf(out, "HetPar1");
-	      else if (_phase[m].ambigParHet == 2)
+	    switch (_phase[m].ambigParHet) {
+	      case 1:
 		fprintf(out, "HetPar0");
-	      else if (_phase[m].ambigParHet == 3)
+		break;
+	      case 2:
+		fprintf(out, "HetPar1");
+		break;
+	      case 3:
 		fprintf(out, "HetPar0_1");
-	    }
-	    else { // heterozygous for one parent
-	      if (_phase[m].ambigParHet == 1)
-		fprintf(out, "HetPar%d", 1 - hetParent);
-	      else if (_phase[m].ambigParHet == 2)
+		break;
+	      case 4:
 		fprintf(out, "HetPar2");
-	      else
-		fprintf(out, "HetPar%d_2", 1 - hetParent);
+		break;
+	      case 5:
+		fprintf(out, "HetPar0_2");
+		break;
+	      case 6:
+		fprintf(out, "HetPar1_2");
+		break;
+
+	      default:
+		fprintf(out, "ERROR: ambigParHet status %d\n",
+			_phase[m].ambigParHet);
+		break;
 	    }
 	  }
 	}
