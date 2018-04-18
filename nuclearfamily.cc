@@ -393,7 +393,7 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
 	    if (_phase[m].ambigParHet) {
 	      // unclear which parent is heterozygous
 	      // will show parents as missing
-	      fprintf(out, "\t0|0\t0|0");
+	      fprintf(out, "\t.|.\t.|.");
 	    }
 	    else {
 	      // print parent's haplotypes
@@ -413,7 +413,7 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
 	      if (_phase[m].ambigParHet || curAmbigMiss >= 2) {
 		// Either which parent is heterozygous is unknown or
 		// child's phase is ambiguous: print missing
-		fprintf(out, "\t0|0");
+		fprintf(out, "\t.|.");
 	      }
 	      else {
 		fprintf(out, "\t%d|%d", parAlleleInds[0][ ivs[0] ],
