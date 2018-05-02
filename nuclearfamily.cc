@@ -78,12 +78,16 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
     uint8_t parentData, hetParent, parentPhase, untrans;
     uint64_t childrenData, iv, ambigMiss, ivFlippable;
     uint8_t imputeParGeno = G_MISS; // by default no imputation
+    uint8_t swapHet = 0; // by default no swapping hets
     char parAlleles[2][2];
     switch(status) {
       case PHASE_UNINFORM:
 	// can impute at uninformative markers, not the others, using the
 	// <homParentGeno> field:
 	imputeParGeno = _phase[m].homParentGeno;
+	// only will need/know to swap heterozygous markers for uninformative
+	// markers
+	swapHet = _phase[m].uninfHetSwap;
       case PHASE_AMBIG:
       case PHASE_ERROR:
       case PHASE_ERR_RECOMB:
@@ -133,7 +137,7 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	for(int c = 0; c < numChildren; c++) {
 	  fprintf(out, " ");
 	  printGeno(out, alleles, childrenData & 3, /*sep=*/ '/',
-		    /*untrans=NA=*/ 0, /*swapHet=*/ _phase[m].uninfHetSwap);
+		    /*untrans=NA=*/ 0, swapHet);
 	  fprintf(out, "   ");
 	  childrenData >>= 2;
 	}
