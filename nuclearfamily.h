@@ -181,6 +181,7 @@ class NuclearFamily {
     }
 
     void printHapTxt(FILE *out, int chrIdx);
+    void printHapJsonPar(FILE *out);
     void printPhasedPed(FILE *out);
     void printPhasedVCF(FILE *out, const char *progamName);
     void printIvCSV(FILE *out, int chrIdx);
@@ -215,7 +216,7 @@ class NuclearFamily {
     // allele is unknown when the parent did not transmit a potentially imputed
     // allele.
     void printGeno(FILE *out, const char *alleles, uint8_t genotype,
-		   char sep = '/', uint8_t untrans = 0, uint8_t swapHet = 0) {
+		   char sep, uint8_t untrans, uint8_t swapHet = 0) {
       switch(genotype) {
 	case G_HOM0:
 	  fprintf(out, "%c%c%c", alleles[untrans & 1], sep,

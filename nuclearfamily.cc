@@ -161,7 +161,6 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 				   alleles[ (_phase[m].homParentGeno / 3) * 2 ];
 	}
 	else {
-	  assert(hetParent == 2);
 	  int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
 			  0 * (1 - (parentPhase >> 1)) + 2*(parentPhase >> 1) };
 	  for(int p = 0; p < 2; p++) {
@@ -183,9 +182,108 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	  if (_phase[m].arbitraryPar)
 	    fprintf(out, "P");
 	  if (_phase[m].ambigParPhase) {
-	    fprintf(out, "S");
-	    if (_phase[m].hetParent == 2)
-	      fprintf(out, "%d", _phase[m].ambigParPhase);
+	    if (_phase[m].hetParent != 2) {
+	      fprintf(out, "S");
+	    }
+	    else {
+	      char swapTypes[4] = { '?', '0', '1', 'B' };
+	      uint8_t diff;
+	      switch(_phase[m].ambigParPhase) {
+		// only a single bit in the ambiguous value cases:
+		case 1:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 2:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 4:
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 8:
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		// two bits in the ambiguous value cases:
+		case 3:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 5:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 6:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 9:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 10:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 12:
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		// three bits in the ambiguous value cases:
+		case 7:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 11:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 13:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		case 14:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "S%c", swapTypes[diff]);
+		  break;
+		default:
+		  // 0:  impossible to get to this branch
+		  // 15: includes the current value which shouldn't happen
+		  fprintf(out, "ERROR: ambigParPhase status %d\n",
+			  _phase[m].ambigParPhase);
+		  break;
+	      }
+	    }
 	  }
 	  if (_phase[m].ambigParHet) {
 	    switch (_phase[m].ambigParHet) {
@@ -261,6 +359,306 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	break;
     }
   }
+}
+
+// Prints the parents' haplotypes for <this> nuclear family to <out> in JSON
+// format. Assumes that a containing object (hash) is the current context in the
+// JSON file.
+void NuclearFamily::printHapJsonPar(FILE *out) {
+  fprintf(out, "\"%s-%s\":", _parents->first->getId(),
+			     _parents->second->getId());
+  // print the haplotypes across all chromosomes
+  //    will have an array of length 2 indexing the haplotypes for each parent
+  fprintf(out, "{\"parhaps\":[");
+  for(int par = 0; par < 2; par++) {
+    if (par == 1)
+      fprintf(out, ","); // separate the parent values in "parhaps" by commas
+
+    // Place the two haplotypes each parent possesses into another array 
+    fprintf(out, "[");
+
+    for(int hap = 0; hap < 2; hap++) {
+      if (hap == 1)
+	fprintf(out, ","); // separate the two haplotypes by commas
+
+      // Haplotype array containing <Marker::getNumMarkers()> elements
+      fprintf(out, "[");
+      for(int m = 0; m < Marker::getNumMarkers(); m++) {
+	const char *alleles = Marker::getMarker(m)->getAlleleStr();
+
+	if (m > 0)
+	  fprintf(out, ","); // separate haplotype alleles by commas
+
+	PhaseStatus status = _phase[m].status;
+	uint8_t hetParent, parentPhase;
+	uint8_t imputeParGeno = G_MISS; // by default no imputation
+	switch(status) {
+	  case PHASE_UNINFORM:
+	    // can impute at uninformative markers, not the others, using the
+	    // <homParentGeno> field:
+	    imputeParGeno = _phase[m].homParentGeno;
+	  case PHASE_AMBIG:
+	  case PHASE_ERROR:
+	  case PHASE_ERR_RECOMB:
+	    ///////////////////////////////////////////////////////////////////
+	    // Not phased / trivially phased cases:
+
+	    {
+	      uint8_t thisParGeno = (_phase[m].parentData >> (par * 2)) & 3;
+	      // <isMissing> is 1 iff thisParGeno == 1:
+	      uint8_t isMissing = (thisParGeno & 1) & ~(thisParGeno >> 1);
+	      // Will print either the parent genotype if it is not missing or
+	      // the imputed genotype if it is missing (note that the default is
+	      // for <imputeParGeno> is missing as well):
+	      uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
+					      isMissing * imputeParGeno;
+	      uint8_t thisUntrans = ((_phase[m].untransParHap >> (par * 2))
+								    >> hap) & 1;
+	      // if untransmitted, then missing:
+	      genoToPrint = (1 - thisUntrans) * genoToPrint +
+							  thisUntrans * G_MISS;
+	      switch (genoToPrint) {
+		case G_HOM0:
+		  fprintf(out, "\"%c\"", alleles[0]);
+		  break;
+		case G_MISS:
+		  fprintf(out, "\"0\"");
+		  break;
+		case G_HET:
+		  fprintf(out, "\"%c\"", alleles[ hap * 2 ]);
+		  break;
+		case G_HOM1:
+		  fprintf(out, "\"%c\"", alleles[2]);
+		  break;
+	      }
+	    }
+	    break;
+
+	  case PHASE_OK:
+	    ///////////////////////////////////////////////////////////////////
+	    // Standard phased marker
+
+	    // first determine which alleles each parent has on each haplotype;
+	    // Note that the <alleles> string has alleles at index 0 and 2
+	    hetParent = _phase[m].hetParent;
+	    parentPhase = _phase[m].parentPhase;
+	    if (hetParent == 2) {
+	      int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
+			      0 * (1 - (parentPhase >> 1)) + 2*(parentPhase >> 1) };
+	      // More readable version of below:
+	      //parAlleles[par][0] = alleles[ ind0[par] ];
+	      //parAlleles[par][1] = alleles[ 2 - ind0[par] ];
+	      int allele = (1 - hap) * ind0[par]   +   hap * (2 - ind0[par]);
+	      fprintf(out, "\"%c\"", alleles[ allele ]);
+	    }
+	    else {
+	      if (hetParent == par) {
+		// current parent heterozygous
+		int ind0 = 0 * (1 - parentPhase) + 2 * parentPhase;
+		// More readable version of below:
+		//parAlleles[0] = alleles[ind0];
+		//parAlleles[1] = alleles[ 2 - ind0 ];
+		int allele = (1 - hap) * ind0   +   hap * (2 - ind0);
+		fprintf(out, "\"%c\"", alleles[ allele ]);
+	      }
+	      else {
+		// current parent homozygous
+		assert(_phase[m].homParentGeno != G_MISS);
+		fprintf(out, "\"%c\"",
+			alleles[ (_phase[m].homParentGeno / 3) * 2]);
+	      }
+	    }
+	    break;
+
+	  default:
+	    fprintf(stderr, "ERROR: marker status %d\n", _phase[m].status);
+	    exit(1);
+	    break;
+	}
+      }
+      fprintf(out, "]"); // end haplotype array
+    }
+    fprintf(out, "]"); // the pair of haplotypes for <par>
+  }
+  fprintf(out, "],"); // "parhaps" value
+
+  // Code array containing <Marker::getNumMarkers()> elements
+  // -> Gives codes that indicate phase state and any ambiguities
+  fprintf(out, "\"codes\":[");
+  for(int m = 0; m < Marker::getNumMarkers(); m++) {
+    if (m > 0)
+      fprintf(out, ","); // separate marker codes by commas
+
+    PhaseStatus status = _phase[m].status;
+    switch(status) {
+      case PHASE_UNINFORM:
+	fprintf(out, "null");
+	break;
+      case PHASE_AMBIG:
+	fprintf(out, "[\"?\"]");
+	break;
+      case PHASE_ERROR:
+	fprintf(out, "[\"E\"]");
+	break;
+      case PHASE_ERR_RECOMB:
+	fprintf(out, "[\"R\"]");
+	break;
+      case PHASE_OK:
+	{
+	  fprintf(out, "[");
+	  bool somethingPrinted = false;
+	  if (_phase[m].arbitraryPar) {
+	    fprintf(out, "\"P\"");
+	    somethingPrinted = true;
+	  }
+	  if (_phase[m].ambigParPhase) {
+	    if (somethingPrinted)
+	      fprintf(out, ",");
+
+	    if (_phase[m].hetParent != 2) {
+	      fprintf(out, "\"S\"");
+	    }
+	    else { // both parent's heterozygous, print details of swap types
+	      char swapTypes[4] = { '?', '0', '1', 'B' };
+	      uint8_t diff;
+	      switch(_phase[m].ambigParPhase) {
+		// only a single bit in the ambiguous value cases:
+		case 1:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 2:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 4:
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 8:
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		// two bits in the ambiguous value cases:
+		case 3:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 5:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 6:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 9:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 10:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 12:
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		// three bits in the ambiguous value cases:
+		case 7:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 11:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 13:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		case 14:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\",", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "\"S%c\"", swapTypes[diff]);
+		  break;
+		default:
+		  // 0:  impossible to get to this branch
+		  // 15: includes the current value which shouldn't happen
+		  fprintf(out, "ERROR: ambigParPhase status %d\n",
+			  _phase[m].ambigParPhase);
+		  break;
+	      }
+	    }
+	    somethingPrinted = true;
+	  }
+	  if (_phase[m].ambigParHet) {
+	    if (somethingPrinted)
+	      fprintf(out, ",");
+
+	    switch (_phase[m].ambigParHet) {
+	      case 1:
+		fprintf(out, "\"H0\"");
+		break;
+	      case 2:
+		fprintf(out, "\"H1\"");
+		break;
+	      case 3:
+		fprintf(out, "\"H01\"");
+		break;
+	      case 4:
+		fprintf(out, "\"H2\"");
+		break;
+	      case 5:
+		fprintf(out, "\"H02\"");
+		break;
+	      case 6:
+		fprintf(out, "\"H12\"");
+		break;
+
+	      default:
+		fprintf(out, "ERROR: ambigParHet status %d\n",
+			_phase[m].ambigParHet);
+		break;
+	    }
+	  }
+
+	  fprintf(out, "]");
+	}
+	break;
+      default:
+	break;
+    }
+  }
+  // end the "codes" value and the "<parent0_id>-<parent1_id>" value
+  fprintf(out, "]}");
 }
 
 // Prints the haplotypes for <this> nuclear family to <out> in VCF format
@@ -385,7 +783,6 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
 		parAlleleInds[1 - hetParent][1] = (_phase[m].homParentGeno / 3);
 	    }
 	    else {
-	      assert(hetParent == 2);
 	      int ind0[2] = { 0 * (1 - (parentPhase & 1)) + (parentPhase & 1),
 			      0 * (1 - (parentPhase >>1)) + (parentPhase >>1) };
 	      for(int p = 0; p < 2; p++) {
@@ -565,7 +962,6 @@ void NuclearFamily::printOnePedHap(FILE *out, int p, int c) {
 				   alleles[ (_phase[m].homParentGeno / 3) * 2 ];
 	  }
 	  else {
-	    assert(hetParent == 2);
 	    int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
 			  0 * (1 - (parentPhase >> 1)) + 2*(parentPhase >> 1) };
 	    for(int p = 0; p < 2; p++) {
