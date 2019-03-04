@@ -504,6 +504,12 @@ void NuclearFamily::printHapJsonPar(FILE *out) {
 	fprintf(out, "[\"R\"]");
 	break;
       case PHASE_OK:
+	if (!(_phase[m].arbitraryPar || _phase[m].ambigParPhase ||
+	      _phase[m].ambigParHet)) {
+	  // well phased:
+	  fprintf(out, "null");
+	  break;
+	}
 	{
 	  fprintf(out, "[");
 	  bool somethingPrinted = false;
