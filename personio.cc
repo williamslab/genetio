@@ -1371,7 +1371,7 @@ void PersonIO<P>::readPlinkBedBulk(FILE *in, FILE *outs[2]) {
       continue;
     }
 
-    uint32_t index = m * bytesPerMarker;
+    uint64_t index = (uint64_t) m * bytesPerMarker;
     int ret = fread(&data[index], bytesPerMarker, sizeof(uint8_t), in);
     if (ret == 0) {
       fprintf(stderr, "\nERROR reading from geno file at marker %d\n", m);
