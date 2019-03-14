@@ -75,11 +75,11 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
     fprintf(out, "%-2s %-5d ", chrName, m - firstMarker);
 
     PhaseStatus status = _phase[m].status;
-    uint8_t parentData, hetParent, parentPhase, untrans;
+    uint8_t parentData, hetParent, untrans;
     uint64_t childrenData, iv, ambigMiss, ivFlippable;
     uint8_t imputeParGeno = G_MISS; // by default no imputation
     uint8_t swapHet = 0; // by default no swapping hets
-    char parAlleles[2][2];
+    uint8_t parAlleleIdx[2][2];
     switch(status) {
       case PHASE_UNINFORM:
 	// can impute at uninformative markers, not the others, using the
@@ -148,139 +148,135 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	/////////////////////////////////////////////////////////////////////
 	// Standard phased marker
 
-	// first determine which alleles each parent has on each haplotype;
-	// Note that the <alleles> string has alleles at index 0 and 2
+	// determine which alleles each parent has on each haplotype;
+	getParAlleles(m, parAlleleIdx);
+
 	hetParent = _phase[m].hetParent;
-	parentPhase = _phase[m].parentPhase;
-	if (hetParent == 0 || hetParent == 1) {
-	  int ind0 = 0 * (1 - parentPhase) + 2 * parentPhase;
-	  parAlleles[hetParent][0] = alleles[ind0];
-	  parAlleles[hetParent][1] = alleles[ 2 - ind0 ];
-	  assert(_phase[m].homParentGeno != G_MISS);
-	  parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] =
-				   alleles[ (_phase[m].homParentGeno / 3) * 2 ];
-	}
-	else {
-	  int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
-			  0 * (1 - (parentPhase >> 1)) + 2*(parentPhase >> 1) };
-	  for(int p = 0; p < 2; p++) {
-	    parAlleles[p][0] = alleles[ ind0[p] ];
-	    parAlleles[p][1] = alleles[ 2 - ind0[p] ];
-	  }
-	}
 
 	// print parent's haplotypes
-	uint8_t parMiss[2];
-	parMiss[0] = _phase[m].parentData & 3;
-	parMiss[1] = (_phase[m].parentData >> 2) & 3;
+	uint8_t parIsMiss[2];
+	parIsMiss[0] = _phase[m].parentData & 3;
+	parIsMiss[1] = (_phase[m].parentData >> 2) & 3;
 	fprintf(out, "%c%c%c %c %c%c%c ",
-		parAlleles[0][0], ambigMissType[parMiss[0]], parAlleles[0][1],
+		alleles[ parAlleleIdx[0][0] ], ambigMissType[ parIsMiss[0] ],
+		alleles[ parAlleleIdx[0][1] ],
 		markerType[hetParent],
-		parAlleles[1][0], ambigMissType[parMiss[1]], parAlleles[1][1]);
+		alleles[ parAlleleIdx[1][0] ], ambigMissType[ parIsMiss[1] ],
+		alleles[ parAlleleIdx[1][1] ]);
+
+	// print phase status
 	if (_phase[m].ambigParPhase | _phase[m].ambigParHet |
 						      _phase[m].arbitraryPar) {
 	  if (_phase[m].arbitraryPar)
 	    fprintf(out, "P");
-	  if (_phase[m].ambigParPhase) {
-	    if (_phase[m].hetParent != 2) {
-	      fprintf(out, "S");
-	    }
-	    else {
+
+	  // Will set this value to be only the bits relative to
+	  // <_phase[m].hetParent> if this first assignment is non-zero:
+	  uint8_t thisParHetAmbigPhase = _phase[m].ambigParPhase;
+	  if (thisParHetAmbigPhase) {
+	    // update to the bits relevant to this hetParent
+	    thisParHetAmbigPhase >>= 2 * hetParent;
+	    uint8_t isPI = hetParent >> 1;
+	    thisParHetAmbigPhase &= isPI * 15 + (1-isPI) * 3;
+	  }
+	  if (thisParHetAmbigPhase) {
+	    fprintf(out, "S");
+	    if (hetParent == 2) {
 	      char swapTypes[4] = { '?', '0', '1', 'B' };
 	      uint8_t diff;
-	      switch(_phase[m].ambigParPhase) {
+	      switch(thisParHetAmbigPhase) {
 		// only a single bit in the ambiguous value cases:
 		case 1:
 		  diff = 0 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 2:
 		  diff = 1 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 4:
 		  diff = 2 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 8:
 		  diff = 3 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		// two bits in the ambiguous value cases:
 		case 3:
 		  diff = 0 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 1 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 5:
 		  diff = 0 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 2 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 6:
 		  diff = 1 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 2 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 9:
 		  diff = 0 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 3 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 10:
 		  diff = 1 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 3 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 12:
 		  diff = 2 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 3 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		// three bits in the ambiguous value cases:
 		case 7:
 		  diff = 0 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 1 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 2 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 11:
 		  diff = 0 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 1 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 3 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 13:
 		  diff = 0 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 2 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 3 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		case 14:
 		  diff = 1 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 2 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  diff = 3 ^ _phase[m].parentPhase;
-		  fprintf(out, "S%c", swapTypes[diff]);
+		  fprintf(out, "%c", swapTypes[diff]);
 		  break;
 		default:
 		  // 0:  impossible to get to this branch
 		  // 15: includes the current value which shouldn't happen
 		  fprintf(out, "ERROR: ambigParPhase status %d\n",
-			  _phase[m].ambigParPhase);
+			  thisParHetAmbigPhase);
 		  break;
 	      }
 	    }
@@ -333,8 +329,9 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	  // TODO: add to the IV output
 	  char curIVchars[2] = { ivLabel[ ivs[0] + ((curIVflip & 1) << 1) ],
 				 ivLabel[ ivs[1] + (curIVflip & 2) ] };
-	  fprintf(out, " %c%c%c %c%c", parAlleles[0][ ivs[0] ],
-		  ambigMissType[curAmbigMiss], parAlleles[1][ ivs[1] ],
+	  fprintf(out, " %c%c%c %c%c", alleles[ parAlleleIdx[0][ ivs[0] ] ],
+		  ambigMissType[curAmbigMiss],
+		  alleles[ parAlleleIdx[1][ ivs[1] ] ],
 		  curIVchars[0], curIVchars[1]);
 	  iv >>= 2;
 	  ivFlippable >>= 2;
@@ -384,14 +381,15 @@ void NuclearFamily::printHapJsonPar(FILE *out) {
       // Haplotype array containing <Marker::getNumMarkers()> elements
       fprintf(out, "[");
       for(int m = 0; m < Marker::getNumMarkers(); m++) {
-	const char *alleles = Marker::getMarker(m)->getAlleleStr();
+	const char *theAlleles = Marker::getMarker(m)->getAlleleStr();
+	char alleles[3] = { theAlleles[0], '0', theAlleles[2] };
 
 	if (m > 0)
 	  fprintf(out, ","); // separate haplotype alleles by commas
 
 	PhaseStatus status = _phase[m].status;
-	uint8_t hetParent, parentPhase;
 	uint8_t imputeParGeno = G_MISS; // by default no imputation
+	uint8_t parAlleleIdx[2][2];
 	switch(status) {
 	  case PHASE_UNINFORM:
 	    // can impute at uninformative markers, not the others, using the
@@ -438,36 +436,9 @@ void NuclearFamily::printHapJsonPar(FILE *out) {
 	    ///////////////////////////////////////////////////////////////////
 	    // Standard phased marker
 
-	    // first determine which alleles each parent has on each haplotype;
-	    // Note that the <alleles> string has alleles at index 0 and 2
-	    hetParent = _phase[m].hetParent;
-	    parentPhase = _phase[m].parentPhase;
-	    if (hetParent == 2) {
-	      int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
-			      0 * (1 - (parentPhase >> 1)) + 2*(parentPhase >> 1) };
-	      // More readable version of below:
-	      //parAlleles[par][0] = alleles[ ind0[par] ];
-	      //parAlleles[par][1] = alleles[ 2 - ind0[par] ];
-	      int allele = (1 - hap) * ind0[par]   +   hap * (2 - ind0[par]);
-	      fprintf(out, "\"%c\"", alleles[ allele ]);
-	    }
-	    else {
-	      if (hetParent == par) {
-		// current parent heterozygous
-		int ind0 = 0 * (1 - parentPhase) + 2 * parentPhase;
-		// More readable version of below:
-		//parAlleles[0] = alleles[ind0];
-		//parAlleles[1] = alleles[ 2 - ind0 ];
-		int allele = (1 - hap) * ind0   +   hap * (2 - ind0);
-		fprintf(out, "\"%c\"", alleles[ allele ]);
-	      }
-	      else {
-		// current parent homozygous
-		assert(_phase[m].homParentGeno != G_MISS);
-		fprintf(out, "\"%c\"",
-			alleles[ (_phase[m].homParentGeno / 3) * 2]);
-	      }
-	    }
+	    getParAlleles(m, parAlleleIdx);
+
+	    fprintf(out, "\"%c\"", alleles[ parAlleleIdx[par][hap] ]);
 	    break;
 
 	  default:
@@ -517,7 +488,17 @@ void NuclearFamily::printHapJsonPar(FILE *out) {
 	    fprintf(out, "\"P\"");
 	    somethingPrinted = true;
 	  }
-	  if (_phase[m].ambigParPhase) {
+
+	  // Will set this value to be only the bits relative to
+	  // <_phase[m].hetParent> if this first assignment is non-zero:
+	  uint8_t thisParHetAmbigPhase = _phase[m].ambigParPhase;
+	  if (thisParHetAmbigPhase) {
+	    // update to the bits relevant to this hetParent
+	    thisParHetAmbigPhase >>= 2 * _phase[m].hetParent;
+	    uint8_t isPI = _phase[m].hetParent >> 1;
+	    thisParHetAmbigPhase &= isPI * 15 + (1-isPI) * 3;
+	  }
+	  if (thisParHetAmbigPhase) {
 	    if (somethingPrinted)
 	      fprintf(out, ",");
 
@@ -527,7 +508,7 @@ void NuclearFamily::printHapJsonPar(FILE *out) {
 	    else { // both parent's heterozygous, print details of swap types
 	      char swapTypes[4] = { '?', '0', '1', 'B' };
 	      uint8_t diff;
-	      switch(_phase[m].ambigParPhase) {
+	      switch(thisParHetAmbigPhase) {
 		// only a single bit in the ambiguous value cases:
 		case 1:
 		  diff = 0 ^ _phase[m].parentPhase;
@@ -619,7 +600,7 @@ void NuclearFamily::printHapJsonPar(FILE *out) {
 		  // 0:  impossible to get to this branch
 		  // 15: includes the current value which shouldn't happen
 		  fprintf(out, "ERROR: ambigParPhase status %d\n",
-			  _phase[m].ambigParPhase);
+			  thisParHetAmbigPhase);
 		  break;
 	      }
 	    }
@@ -665,6 +646,171 @@ void NuclearFamily::printHapJsonPar(FILE *out) {
   }
   // end the "codes" value and the "<parent0_id>-<parent1_id>" value
   fprintf(out, "]}");
+}
+
+// Determines the alleles the two parents carry at <marker>. The caller has a
+// character array with 3 entries: index 0 is allele 0, index 1 is the missing
+// allele code (likely '0'), and index 2 is allele 1
+void NuclearFamily::getParAlleles(int marker, uint8_t parAlleleIdx[2][2]) {
+  uint8_t hetParent = _phase[marker].hetParent;
+  uint8_t defaultPhase = _phase[marker].parentPhase;
+
+  if (hetParent == 2) {
+    // Both parents heterozygous
+    int defaultParPhase[2] = { defaultPhase & 1, defaultPhase >> 1 };
+    int idx0[2];
+
+    // assuming no ambiguity, these are the parent allele indexes:
+    for(int p = 0; p < 2; p++) {
+      idx0[p] = 0 * (1 - defaultParPhase[p]) + 2 * defaultParPhase[p];
+      parAlleleIdx[p][0] = idx0[p];
+      parAlleleIdx[p][1] = 2 - idx0[p];
+    }
+
+    // any ambig par het means this parent could be homozygous:
+    if (_phase[marker].ambigParHet) {
+      for(int p = 0; p < 2; p++) {
+	// If the ambiguous heterozygosity can include only <p>:
+	uint8_t phaseBitsIfHetP = (_phase[marker].ambigParPhase >> (2*p)) & 3;
+	if (phaseBitsIfHetP) {
+	  // First: effects on <p>
+	  if (phaseBitsIfHetP == 3) {
+	    // Both phase types valid, so neither allele is certain:
+	    parAlleleIdx[p][0] = parAlleleIdx[p][1] = 1; // 1 is missing idx
+	  }
+	  else {
+	    // get the bit that's assigned in <phaseBitsIfHetP>;
+	    // In this case it's trivial to do:
+	    uint8_t phaseIfHetPar = phaseBitsIfHetP - 1;
+	    if (phaseIfHetPar != defaultParPhase[p])
+	      // opposite phase assignment when heterozygous only for the
+	      // current parent, so both alleles are ambiguous:
+	      parAlleleIdx[p][0] = parAlleleIdx[p][1] = 1; // 1 is missing idx
+	  }
+
+	  // Second: this phase possibility implies that <1-p> can be homozygous
+	  // must set the allele that doesn't match the homozygous genotype
+	  // to missing
+	  int otherP = 1 - p;
+	  for(int h = 0; h < 2; h++)
+	    if (parAlleleIdx[otherP][h] != (_phase[marker].homParentGeno / 3))
+	      parAlleleIdx[otherP][h] = 1;
+	}
+      }
+    }
+  }
+  else {
+    // One parent homozygous; we should know which genotype:
+    assert(_phase[marker].homParentGeno != G_MISS);
+
+    // assuming no ambiguity, these are the parent allele indexes:
+    int idx0 = 0 * (1 - defaultPhase) + 2 * defaultPhase;
+    parAlleleIdx[hetParent][0] = idx0;
+    parAlleleIdx[hetParent][1] = 2 - idx0;
+    parAlleleIdx[1 - hetParent][0] = parAlleleIdx[1 - hetParent][1] =
+					(_phase[marker].homParentGeno / 3) * 2;
+
+    // ambig par het? if so, haplotype allele index could be uncertain
+    if (_phase[marker].ambigParHet) {
+      // If the ambiguous heterozygosity is with only parent (1 - <hetParent>)
+      // being heterozygous (H0 or H1):
+      uint8_t otherP = 1 - hetParent;
+      uint8_t phaseBitsIfHetOtherP =
+			    (_phase[marker].ambigParPhase >> (2 * otherP)) & 3;
+      if (phaseBitsIfHetOtherP) {
+	// there exists a possibility with <hetParent> homozygous;
+	// must set the allele that doesn't match the homozygous genotype
+	// to missing
+	for(int h = 0; h < 2; h++)
+	  if (parAlleleIdx[hetParent][h] != (_phase[marker].homParentGeno / 3))
+	    parAlleleIdx[hetParent][h] = 1; // 1 is missing idx
+
+	// in this case, <otherP> is heterozygous; set uncertain alleles to
+	// missing:
+	if (phaseBitsIfHetOtherP == 3) {
+	  // Both phase types valid, so neither allele is certain:
+	  parAlleleIdx[otherP][0] = parAlleleIdx[otherP][1] = 1;
+	}
+	else {
+	  // get the bit that's assigned in <phaseBitsIfHetOtherP>;
+	  // In this case it's trivial to do:
+	  uint8_t phaseIfOtherPHet = phaseBitsIfHetOtherP - 1;
+	  int otherPHet_idx0 = 0 * (1 - phaseIfOtherPHet) + 2 *phaseIfOtherPHet;
+	    // check both haplotypes in <otherP>, and set missing sites that
+	    // differ
+	    if (parAlleleIdx[otherP][0] != otherPHet_idx0)
+	      parAlleleIdx[otherP][0] = 1; // 1 is missing idx
+	    // TODO: else?
+	    if (parAlleleIdx[otherP][1] != 2 - otherPHet_idx0)
+	      parAlleleIdx[otherP][1] = 1; // 1 is missing idx
+	}
+      }
+
+      // If the ambiguous heterozygosity is with both parents being
+      // heterozygous (H2):
+      uint8_t phaseBitsIfHet2 = _phase[marker].ambigParPhase >> (2 * 2);
+      if (phaseBitsIfHet2) {
+	uint8_t phaseSwapType = 0; // one of the possible swap types
+	uint8_t phaseSwapTypeAssigned = 0; // has <phaseSwapType> been assigned?
+	// is there more than one valid swap types? bits in <ambigSwap> indicate
+	// which bits vary, with bit 0 corresponding to phase for parent 0, and
+	// bit 1 for parent 1.
+	uint8_t ambigSwap = 0;
+	for(int curSwap = 0; curSwap < 4; curSwap++) {
+	  uint8_t curIsValid = (phaseBitsIfHet2 >> curSwap) & 1;
+	  phaseSwapType |= (1 - phaseSwapTypeAssigned) * curIsValid * curSwap;
+	  phaseSwapTypeAssigned |= curIsValid;
+	  ambigSwap |= curIsValid * (phaseSwapType ^ curSwap);
+	}
+
+	if (ambigSwap == 3) {
+	  // all alleles completely uncertain:
+	  parAlleleIdx[0][0] = parAlleleIdx[0][1] =
+	    parAlleleIdx[1][0] = parAlleleIdx[1][1] = 1; // 1 is missing idx
+	}
+	else {
+	  if (ambigSwap) {
+	    // uncertain phase for one parent, set sites missing for that parent
+	    uint8_t ambigPar = ambigSwap - 1;
+	    parAlleleIdx[ambigPar][0] = parAlleleIdx[ambigPar][1] = 1;
+
+	    uint8_t unambigPar = 1 - ambigPar;
+	    uint8_t bothHetPhase_unambigPar = (phaseSwapType >> unambigPar) & 1;
+	    int bothHet_unambig_idx0 = 0 * (1 - bothHetPhase_unambigPar) +
+						    2 * bothHetPhase_unambigPar;
+	    // check both haplotypes in <unambigPar>, and set missing sites that
+	    // differ
+	    if (parAlleleIdx[unambigPar][0] != bothHet_unambig_idx0)
+	      parAlleleIdx[unambigPar][0] = 1; // 1 is missing idx
+	    // TODO: else?
+	    if (parAlleleIdx[unambigPar][1] != 2 - bothHet_unambig_idx0)
+	      parAlleleIdx[unambigPar][1] = 1; // 1 is missing idx
+	  }
+	  else {
+	    // only one phase type; determine whether the <hetParent> phase
+	    // remains the same as the default
+	    uint8_t bothHetPhase_defaultHetPar =(phaseSwapType >> hetParent) &1;
+	    if (bothHetPhase_defaultHetPar != defaultPhase) 
+	      // opposite phase assignment when heterozygous for both parents,
+	      // so both alleles are ambiguous:
+	      parAlleleIdx[hetParent][0] = parAlleleIdx[hetParent][1] = 1;
+
+	    uint8_t homPar = 1 - hetParent;
+	    uint8_t bothHetPhase_homPar = (phaseSwapType >> homPar) & 1;
+	    int bothHet_hom_idx0 = 0 * (1 - bothHetPhase_homPar) +
+						  2 * bothHetPhase_homPar;
+	    // check both haplotypes in <homPar>, and set missing sites that
+	    // differ
+	    if (parAlleleIdx[homPar][0] != bothHet_hom_idx0)
+	      parAlleleIdx[homPar][0] = 1; // 1 is missing idx
+	    // TODO: else?
+	    if (parAlleleIdx[homPar][1] != 2 - bothHet_hom_idx0)
+	      parAlleleIdx[homPar][1] = 1; // 1 is missing idx
+	  }
+	}
+      }
+    } // ambiguous parent heterozygosity
+  } // one parent heterozygous case
 }
 
 // Prints the haplotypes for <this> nuclear family to <out> in VCF format
@@ -781,19 +927,19 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
 	    uint8_t parentPhase = _phase[m].parentPhase;
 	    int parAlleleInds[2][2]; // Allele indexes: 0 for ref, 1 for alt
 	    if (hetParent == 0 || hetParent == 1) {
-	      int ind0 = 0 * (1 - parentPhase) + parentPhase;
-	      parAlleleInds[hetParent][0] = ind0;
-	      parAlleleInds[hetParent][1] = 1 - ind0;
+	      int idx0 = 0 * (1 - parentPhase) + parentPhase;
+	      parAlleleInds[hetParent][0] = idx0;
+	      parAlleleInds[hetParent][1] = 1 - idx0;
 	      assert(_phase[m].homParentGeno != G_MISS);
 	      parAlleleInds[1 - hetParent][0] =
 		parAlleleInds[1 - hetParent][1] = (_phase[m].homParentGeno / 3);
 	    }
 	    else {
-	      int ind0[2] = { 0 * (1 - (parentPhase & 1)) + (parentPhase & 1),
+	      int idx0[2] = { 0 * (1 - (parentPhase & 1)) + (parentPhase & 1),
 			      0 * (1 - (parentPhase >>1)) + (parentPhase >>1) };
 	      for(int p = 0; p < 2; p++) {
-		parAlleleInds[p][0] = ind0[p];
-		parAlleleInds[p][1] = 1 - ind0[p];
+		parAlleleInds[p][0] = idx0[p];
+		parAlleleInds[p][1] = 1 - idx0[p];
 	      }
 	    }
 
@@ -960,19 +1106,19 @@ void NuclearFamily::printOnePedHap(FILE *out, int p, int c) {
 	  uint8_t parentPhase = _phase[m].parentPhase;
 	  char parAlleles[2][2];
 	  if (hetParent == 0 || hetParent == 1) {
-	    int ind0 = 0 * (1 - parentPhase) + 2 * parentPhase;
-	    parAlleles[hetParent][0] = alleles[ind0];
-	    parAlleles[hetParent][1] = alleles[ 2 - ind0 ];
+	    int idx0 = 0 * (1 - parentPhase) + 2 * parentPhase;
+	    parAlleles[hetParent][0] = alleles[idx0];
+	    parAlleles[hetParent][1] = alleles[ 2 - idx0 ];
 	    assert(_phase[m].homParentGeno != G_MISS);
 	    parAlleles[1 - hetParent][0] = parAlleles[1 - hetParent][1] =
 				   alleles[ (_phase[m].homParentGeno / 3) * 2 ];
 	  }
 	  else {
-	    int ind0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
+	    int idx0[2] = { 0 * (1 - (parentPhase & 1)) + 2 *(parentPhase & 1),
 			  0 * (1 - (parentPhase >> 1)) + 2*(parentPhase >> 1) };
 	    for(int p = 0; p < 2; p++) {
-	      parAlleles[p][0] = alleles[ ind0[p] ];
-	      parAlleles[p][1] = alleles[ 2 - ind0[p] ];
+	      parAlleles[p][0] = alleles[ idx0[p] ];
+	      parAlleles[p][1] = alleles[ 2 - idx0[p] ];
 	    }
 	  }
 
@@ -1131,11 +1277,120 @@ void NuclearFamily::printIvCSV(FILE *out, int chrIdx) {
 	  if (_phase[m].arbitraryPar) {
 	    fprintf(out, "ParArbitrary");
 	  }
-	  if (_phase[m].ambigParPhase) {
-	    if (_phase[m].hetParent == 2)
-	      fprintf(out, "S%d", _phase[m].ambigParPhase);
-	    else
+
+	  // Will set this value to be only the bits relative to
+	  // <_phase[m].hetParent> if this first assignment is non-zero:
+	  uint8_t thisParHetAmbigPhase = _phase[m].ambigParPhase;
+	  if (thisParHetAmbigPhase) {
+	    // update to the bits relevant to this hetParent
+	    thisParHetAmbigPhase >>= 2 * _phase[m].hetParent;
+	    uint8_t isPI = _phase[m].hetParent >> 1;
+	    thisParHetAmbigPhase &= isPI * 15 + (1-isPI) * 3;
+	  }
+	  if (thisParHetAmbigPhase) {
+	    if (_phase[m].hetParent != 2) {
 	      fprintf(out, "Swap");
+	    }
+	    else { // both parent's heterozygous, print details of swap types
+	      fprintf(out, "S");
+	      char swapTypes[4] = { '?', '0', '1', 'B' };
+	      uint8_t diff;
+	      switch(thisParHetAmbigPhase) {
+		// only a single bit in the ambiguous value cases:
+		case 1:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 2:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 4:
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 8:
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		// two bits in the ambiguous value cases:
+		case 3:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 5:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 6:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 9:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 10:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 12:
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		// three bits in the ambiguous value cases:
+		case 7:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 11:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 13:
+		  diff = 0 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		case 14:
+		  diff = 1 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 2 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  diff = 3 ^ _phase[m].parentPhase;
+		  fprintf(out, "%c", swapTypes[diff]);
+		  break;
+		default:
+		  // 0:  impossible to get to this branch
+		  // 15: includes the current value which shouldn't happen
+		  fprintf(out, "ERROR: ambigParPhase status %d\n",
+			  thisParHetAmbigPhase);
+		  break;
+	      }
+	    }
 	    if (_phase[m].ambigParHet)
 	      fprintf(out, "_");
 	  }

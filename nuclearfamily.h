@@ -51,8 +51,10 @@ struct PhaseVals {
   uint8_t numRecombs;    // Since previous marker
   uint8_t ambigParHet;   // Can fit in 3 bit
   // Each bit indicates presence or absence of different equal probability
-  // <parentPhase> values
-  uint8_t ambigParPhase; // Can fit in 4 bits
+  // <parentPhase> values; represents the phase possibilities for all three
+  // possible parent heterozygosity statuses. See Phaser::ambigParPhase in the
+  // HAPI2 repository
+  uint8_t ambigParPhase; // Requires 8 bits
   uint8_t arbitraryPar;  // Can fit in 1 bit
   // TODO; either compress the above so they fit in 3 words or remove numRecombs
 };
@@ -208,6 +210,7 @@ class NuclearFamily {
     // private methods
     //////////////////////////////////////////////////////////////////
 
+    void getParAlleles(int marker, uint8_t parAlleleIdx[2][2]);
     void printOnePedHap(FILE *out, int p, int c);
 
     // alleles is expected to contain in elements 0 and 2 the two alleles for
