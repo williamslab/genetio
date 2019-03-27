@@ -693,7 +693,7 @@ void NuclearFamily::getParAlleles(int marker, uint8_t parAlleleIdx[2][2]) {
 	  // to missing
 	  int otherP = 1 - p;
 	  for(int h = 0; h < 2; h++)
-	    if (parAlleleIdx[otherP][h] != (_phase[marker].homParentGeno / 3))
+	    if (parAlleleIdx[otherP][h] != (_phase[marker].homParentGeno /3) *2)
 	      parAlleleIdx[otherP][h] = 1;
 	}
       }
@@ -722,7 +722,7 @@ void NuclearFamily::getParAlleles(int marker, uint8_t parAlleleIdx[2][2]) {
 	// must set the allele that doesn't match the homozygous genotype
 	// to missing
 	for(int h = 0; h < 2; h++)
-	  if (parAlleleIdx[hetParent][h] != (_phase[marker].homParentGeno / 3))
+	  if (parAlleleIdx[hetParent][h] != (_phase[marker].homParentGeno /3)*2)
 	    parAlleleIdx[hetParent][h] = 1; // 1 is missing idx
 
 	// in this case, <otherP> is heterozygous; set uncertain alleles to
