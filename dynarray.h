@@ -77,10 +77,16 @@ dynarray<T>::~dynarray() {
 template <class T>
 dynarray<T>& dynarray<T>::operator=(const dynarray<T>& t) {
   if (&t == this) return *this;
-  if (data != 0) delete [] data;
+  bool needNew = false;
   nData = t.length();
-  arraySize = t.arraySize;
-  data = new T[arraySize];
+  if (data != NULL && arraySize < nData) {
+    delete [] data;
+    needNew = true;
+  }
+  if (data == NULL || needNew) {
+    arraySize = t.arraySize;
+    data = new T[arraySize];
+  }
   for (int i = 0; i < t.length(); i++)
     data[i] = t[i];
   return *this;
