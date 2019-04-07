@@ -481,6 +481,10 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 	  for(int har = 0; har < 2; har++)
 	    hapStrs[par * 2 + har][m] = alleles[ parAlleleIdx[par][har] ];
 
+	if (!withChildren)
+	  // not printing children: done
+	  break;
+
 	// children's haplotypes
 	for(int c = 0; c < numChildren; c++) {
 	  uint8_t curIV = (_phase[m].iv >> (2*c)) & 3;
