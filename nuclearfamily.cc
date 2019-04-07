@@ -358,13 +358,148 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
   }
 }
 
-// Prints the parents' haplotypes for <this> nuclear family to <out> in JSON
-// format. Assumes that a containing object (hash) is the current context in the
-// JSON file.
-void NuclearFamily::printHapJsonPar(FILE *out) {
+// Prints the parents' and optionally children's haplotypes for <this> nuclear
+// family to <out> in JSON format. Assumes that a containing object (hash) is
+// the current context in the JSON file.
+void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
   fprintf(out, "\"%s-%s\":", _parents->first->getId(),
 			     _parents->second->getId());
-  // print the haplotypes across all chromosomes
+  // The order of the JSON format output is the transpose of other ways we print
+  // to save redundant work, we store strings representing the haplotypes of the
+  // parents and any children and then printing is simple.
+
+  // Because HAPI2 is limited to 32 children, we'll allocate an array of fixed
+  // (maximum) size. Easy to change if HAPI changes.
+  char *hapStrs[64 + 4];
+
+  int numHaps = 2 * 2;
+  int numChildren = _children.length();
+  int numMarkers = Marker::getNumMarkers();
+  if (withChildren) {
+    numHaps += 2 * numChildren;
+    assert(numChildren <= 32);
+  }
+
+  for(int h = 0; h < numHaps; h++)
+    hapStrs[h] = new char[numMarkers];
+
+  for(int m = 0; m < numMarkers; m++) {
+    const char *theAlleles = Marker::getMarker(m)->getAlleleStr();
+    char alleles[3] = { theAlleles[0], '0', theAlleles[2] };
+
+    PhaseStatus status = _phase[m].status;
+    uint8_t imputeParGeno = G_MISS; // by default no imputation
+    uint8_t swapHet = 0; // by default no swapping hets
+    uint8_t parAlleleIdx[2][2];
+    switch(status) {
+      case PHASE_UNINFORM:
+	// can impute at uninformative markers, not the others, using the
+	// <homParentGeno> field:
+	imputeParGeno = _phase[m].homParentGeno;
+	// only will need/know to swap heterozygous markers for uninformative
+	// markers
+	swapHet = _phase[m].uninfHetSwap;
+      case PHASE_AMBIG:
+      case PHASE_ERROR:
+      case PHASE_ERR_RECOMB:
+	///////////////////////////////////////////////////////////////////
+	// Not phased / trivially phased cases:
+
+	{
+	  for(int par = 0; par < 2; par++) {
+	    uint8_t thisParGeno = (_phase[m].parentData >> (par * 2)) & 3;
+	    uint8_t thisUntrans = (_phase[m].untransParHap >> (par * 2)) & 3;
+	    // <isMissing> is 1 iff thisParGeno == 1:
+	    uint8_t isMissing = (thisParGeno & 1) & ~(thisParGeno >> 1);
+	    // Will print either the parent genotype if it is not missing or
+	    // the imputed genotype if it is missing (note that the default is
+	    // for <imputeParGeno> is missing as well):
+	    uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
+					      isMissing * imputeParGeno;
+	    for(int hap = 0; hap < 2; hap++) {
+	      uint8_t curUntrans = (thisUntrans >> hap) & 1;
+	      // if untransmitted, then missing:
+	      uint8_t curGenoToPrint = (1 - curUntrans) * genoToPrint +
+							  curUntrans * G_MISS;
+	      switch (curGenoToPrint) {
+		case G_HOM0:
+		  hapStrs[par * 2 + hap][m] = alleles[0];
+		  break;
+		case G_MISS:
+		  hapStrs[par * 2 + hap][m] = '0';
+		  break;
+		case G_HET:
+		  hapStrs[par * 2 + hap][m] = alleles[ hap * 2 ];
+		  break;
+		case G_HOM1:
+		  hapStrs[par * 2 + hap][m] = alleles[2];
+		  break;
+	      }
+	    } // haplotype
+	  } // parent
+
+	  if (!withChildren)
+	    // not printing children: done
+	    break;
+
+	  // also printing children
+	  uint64_t childrenData = _phase[m].iv;
+	  for(int c = 0; c < numChildren; c++) {
+	    uint8_t childGenotype = childrenData & 3;
+
+	    uint8_t hap0;
+	    switch (childGenotype) {
+	      case G_HOM0:
+		hapStrs[4 + c*2 + 0][m] = hapStrs[4 + c*2 + 1][m] = alleles[0];
+		break;
+	      case G_MISS:
+		hapStrs[4 + c*2 + 0][m] = hapStrs[4 + c*2 + 1][m] = '0';
+		break;
+	      case G_HET:
+		// if <swapHet> == 0, hap0 == 0. Otherwise, hap0 == 1 (swapped)
+		hap0 = swapHet;
+		hapStrs[4 + c*2 + hap0][m] = alleles[0];
+		hapStrs[4 + c*2 + (1 - hap0)][m] = alleles[2];
+		break;
+	      case G_HOM1:
+		hapStrs[4 + c*2 + 0][m] = hapStrs[4 + c*2 + 1][m] = alleles[2];
+		break;
+	    }
+
+	    childrenData >>= 2;
+	  }
+	}
+	break;
+
+      case PHASE_OK:
+	///////////////////////////////////////////////////////////////////
+	// Standard phased marker
+
+	getParAlleles(m, parAlleleIdx);
+
+	for(int par = 0; par < 2; par++)
+	  for(int har = 0; har < 2; har++)
+	    hapStrs[par * 2 + har][m] = alleles[ parAlleleIdx[par][har] ];
+
+	// children's haplotypes
+	for(int c = 0; c < numChildren; c++) {
+	  uint8_t curIV = (_phase[m].iv >> (2*c)) & 3;
+
+	  int ivs[2] = { curIV & 1, curIV >> 1 };
+	  hapStrs[4 + c*2 + 0][m] = alleles[ parAlleleIdx[0][ ivs[0] ] ];
+	  hapStrs[4 + c*2 + 1][m] = alleles[ parAlleleIdx[1][ ivs[1] ] ];
+
+	}
+	break;
+
+      default:
+	fprintf(stderr, "ERROR: marker status %d\n", _phase[m].status);
+	exit(1);
+	break;
+    }
+  }
+
+  // print the parent haplotypes across all chromosomes
   //    will have an array of length 2 indexing the haplotypes for each parent
   fprintf(out, "{\"parhaps\":[");
   for(int par = 0; par < 2; par++) {
@@ -378,85 +513,58 @@ void NuclearFamily::printHapJsonPar(FILE *out) {
       if (hap == 1)
 	fprintf(out, ","); // separate the two haplotypes by commas
 
-      // Haplotype array containing <Marker::getNumMarkers()> elements
+      // Haplotype array containing <numMarkers> elements
       fprintf(out, "[");
-      for(int m = 0; m < Marker::getNumMarkers(); m++) {
-	const char *theAlleles = Marker::getMarker(m)->getAlleleStr();
-	char alleles[3] = { theAlleles[0], '0', theAlleles[2] };
-
+      for(int m = 0; m < numMarkers; m++) {
 	if (m > 0)
 	  fprintf(out, ","); // separate haplotype alleles by commas
 
-	PhaseStatus status = _phase[m].status;
-	uint8_t imputeParGeno = G_MISS; // by default no imputation
-	uint8_t parAlleleIdx[2][2];
-	switch(status) {
-	  case PHASE_UNINFORM:
-	    // can impute at uninformative markers, not the others, using the
-	    // <homParentGeno> field:
-	    imputeParGeno = _phase[m].homParentGeno;
-	  case PHASE_AMBIG:
-	  case PHASE_ERROR:
-	  case PHASE_ERR_RECOMB:
-	    ///////////////////////////////////////////////////////////////////
-	    // Not phased / trivially phased cases:
-
-	    {
-	      uint8_t thisParGeno = (_phase[m].parentData >> (par * 2)) & 3;
-	      // <isMissing> is 1 iff thisParGeno == 1:
-	      uint8_t isMissing = (thisParGeno & 1) & ~(thisParGeno >> 1);
-	      // Will print either the parent genotype if it is not missing or
-	      // the imputed genotype if it is missing (note that the default is
-	      // for <imputeParGeno> is missing as well):
-	      uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
-					      isMissing * imputeParGeno;
-	      uint8_t thisUntrans = ((_phase[m].untransParHap >> (par * 2))
-								    >> hap) & 1;
-	      // if untransmitted, then missing:
-	      genoToPrint = (1 - thisUntrans) * genoToPrint +
-							  thisUntrans * G_MISS;
-	      switch (genoToPrint) {
-		case G_HOM0:
-		  fprintf(out, "\"%c\"", alleles[0]);
-		  break;
-		case G_MISS:
-		  fprintf(out, "\"0\"");
-		  break;
-		case G_HET:
-		  fprintf(out, "\"%c\"", alleles[ hap * 2 ]);
-		  break;
-		case G_HOM1:
-		  fprintf(out, "\"%c\"", alleles[2]);
-		  break;
-	      }
-	    }
-	    break;
-
-	  case PHASE_OK:
-	    ///////////////////////////////////////////////////////////////////
-	    // Standard phased marker
-
-	    getParAlleles(m, parAlleleIdx);
-
-	    fprintf(out, "\"%c\"", alleles[ parAlleleIdx[par][hap] ]);
-	    break;
-
-	  default:
-	    fprintf(stderr, "ERROR: marker status %d\n", _phase[m].status);
-	    exit(1);
-	    break;
-	}
+	// Allele at marker <m>:
+	fprintf(out, "\"%c\"", hapStrs[par * 2 + hap][m]);
       }
       fprintf(out, "]"); // end haplotype array
     }
     fprintf(out, "]"); // the pair of haplotypes for <par>
   }
-  fprintf(out, "],"); // "parhaps" value
+  fprintf(out, "]"); // "parhaps" value
 
-  // Code array containing <Marker::getNumMarkers()> elements
+
+  if (withChildren) {
+    // print the children's haplotypes across all chromosomes
+    fprintf(out, ",\"childhaps\":{");
+    for(int c = 0; c < numChildren; c++) {
+      if (c > 0)
+	fprintf(out, ","); // separate the child values in "childhaps" by commas
+
+      // top level is a dictionary indexed by child id; value of each entry is
+      // an array with two values for the two haplotypes
+      fprintf(out, "\"%s\":[", _children[c]->getId());
+
+      for(int hap = 0; hap < 2; hap++) {
+	if (hap == 1)
+	  fprintf(out, ","); // separate the two haplotypes by commas
+
+	// Haplotype array containing <numMarkers> elements
+	fprintf(out, "[");
+	for(int m = 0; m < numMarkers; m++) {
+	  if (m > 0)
+	    fprintf(out, ","); // separate haplotype alleles by commas
+
+	  // Allele at marker <m>:
+	  fprintf(out, "\"%c\"", hapStrs[4 + c * 2 + hap][m]);
+	}
+	fprintf(out, "]"); // end haplotype array
+      }
+
+      fprintf(out, "]"); // the pair of haplotypes for child <c>
+    }
+    fprintf(out, "}"); // end "childhaps" value
+  }
+
+  // Code array containing <numMarkers> elements
   // -> Gives codes that indicate phase state and any ambiguities
-  fprintf(out, "\"codes\":[");
-  for(int m = 0; m < Marker::getNumMarkers(); m++) {
+  fprintf(out, ",\"codes\":[");
+  for(int m = 0; m < numMarkers; m++) {
     if (m > 0)
       fprintf(out, ","); // separate marker codes by commas
 
@@ -646,6 +754,9 @@ void NuclearFamily::printHapJsonPar(FILE *out) {
   }
   // end the "codes" value and the "<parent0_id>-<parent1_id>" value
   fprintf(out, "]}");
+
+  for(int h = 0; h < numHaps; h++)
+    delete [] hapStrs[h];
 }
 
 // Determines the alleles the two parents carry at <marker>. The caller has a

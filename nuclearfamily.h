@@ -183,7 +183,7 @@ class NuclearFamily {
     }
 
     void printHapTxt(FILE *out, int chrIdx);
-    void printHapJsonPar(FILE *out);
+    void printHapJson(FILE *out, bool withChildren);
     void printPhasedPed(FILE *out);
     void printPhasedVCF(FILE *out, const char *progamName);
     void printIvCSV(FILE *out, int chrIdx);
