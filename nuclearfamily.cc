@@ -80,6 +80,8 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
     uint8_t imputeParGeno = G_MISS; // by default no imputation
     uint8_t swapHet = 0; // by default no swapping hets
     uint8_t parAlleleIdx[2][2];
+    uint8_t homGenotypes[2] = { G_HOM0, G_HOM1 };
+    bool bothParHomozy = status == PHASE_AMBIG && _phase[m].ambigBothParHomozy;
     switch(status) {
       case PHASE_UNINFORM:
 	// can impute at uninformative markers, not the others, using the
@@ -105,6 +107,8 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	  // Will print either the parent genotype if it is not missing or
 	  // the imputed genotype if it is missing (note that the default is
 	  // for <imputeParGeno> is missing as well):
+	  imputeParGeno = (1 - bothParHomozy) * imputeParGeno +
+			      bothParHomozy * homGenotypes[p];
 	  uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
 					      isMissing * imputeParGeno;
 	  printGeno(out, alleles, genoToPrint, ambigMissType[ isMissing ],
@@ -391,6 +395,8 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
     uint8_t imputeParGeno = G_MISS; // by default no imputation
     uint8_t swapHet = 0; // by default no swapping hets
     uint8_t parAlleleIdx[2][2];
+    uint8_t homGenotypes[2] = { G_HOM0, G_HOM1 };
+    bool bothParHomozy = status == PHASE_AMBIG && _phase[m].ambigBothParHomozy;
     switch(status) {
       case PHASE_UNINFORM:
 	// can impute at uninformative markers, not the others, using the
@@ -414,6 +420,8 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 	    // Will print either the parent genotype if it is not missing or
 	    // the imputed genotype if it is missing (note that the default is
 	    // for <imputeParGeno> is missing as well):
+	    imputeParGeno = (1 - bothParHomozy) * imputeParGeno +
+			      bothParHomozy * homGenotypes[par];
 	    uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
 					      isMissing * imputeParGeno;
 	    for(int hap = 0; hap < 2; hap++) {
