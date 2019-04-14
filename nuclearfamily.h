@@ -45,6 +45,9 @@ struct PhaseVals {
   // If <uninfHetSwap> == 0, the default print order for heterozygous genotypes
   // gives the correct phase, otherwise this should be swapped.
   uint8_t uninfHetSwap;  // Can fit in 1 bit
+  // For PHASE_AMBIG, are the parents homozygous? Based on the IVs at nearby
+  // informative markers
+  bool ambigBothParHomozy;
   uint8_t parentPhase;   // Can fit in 2 bits
   PhaseStatus status;    // Can fit in 2 bits
   // TODO: recalculate this when needed?
@@ -174,8 +177,11 @@ class NuclearFamily {
     // parent haplotypes were transmitted to the children at the corresponding
     // marker. This used to help impute the parent(s)'s genotypes at
     // uninformative markers.
-    void setUntransPar(int marker, uint8_t untransParHap) {
+    // Also sets <ambigBothParHomozy>.
+    void setUntransPar(int marker, uint8_t untransParHap,
+		       bool ambigBothParHomozy) {
       _phase[marker].untransParHap = untransParHap;
+      _phase[marker].ambigBothParHomozy = ambigBothParHomozy;
     }
 
     const PhaseVals &getPhase(int marker) {
