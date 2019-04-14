@@ -65,6 +65,12 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
   int prevM_OK = -1;
   int firstMarker = Marker::getFirstMarkerNum(chrIdx);
   int lastMarker = Marker::getLastMarkerNum(chrIdx);
+  // For <_phase[m].arbitraryPar>, the first P (and actually the first two
+  // when the first is heterozygous for both parents) are "full" Ps, and not
+  // simply about which parent is assigned as heterozygous. For later Ps, we
+  // add characters to indicate what the phase of the other parent would be if
+  // which one is heteorzygous is flipped.
+  bool encounteredFirstFullP = false;
   for(int m = firstMarker; m <= lastMarker; m++) {
     const char *theAlleles = Marker::getMarker(m)->getAlleleStr();
     // For use with the printGeno() method: allows printing an unknown genotype
@@ -171,8 +177,23 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	// print phase status
 	if (_phase[m].ambigParPhase | _phase[m].ambigParHet |
 						      _phase[m].arbitraryPar) {
-	  if (_phase[m].arbitraryPar)
+	  if (_phase[m].arbitraryPar) {
 	    fprintf(out, "P");
+	    if (encounteredFirstFullP && hetParent < 2) {
+	      iv = _phase[m].iv;
+	      if ((iv & 1) == ((iv >> 1) & 1))
+		// if the other parent is heterozygous, he/she has the same
+		// (_C_urrent) phase as that printed for the heterozygous
+		// parent
+		fprintf(out, "C");
+	      else
+		// if the other parent is heterozygous, he/she has the
+		// _A_lternate phase compared to that printed for the
+		// heterozygous parent
+		fprintf(out, "A");
+	    }
+	    encounteredFirstFullP = encounteredFirstFullP || hetParent < 2;
+	  }
 
 	  // Will set this value to be only the bits relative to
 	  // <_phase[m].hetParent> if this first assignment is non-zero:
@@ -576,9 +597,22 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
   // Code array containing <numMarkers> elements
   // -> Gives codes that indicate phase state and any ambiguities
   fprintf(out, ",\"codes\":[");
+
+  // For <_phase[m].arbitraryPar>, the first P (and actually the first two
+  // when the first is heterozygous for both parents) are "full" Ps, and not
+  // simply about which parent is assigned as heterozygous. For later Ps, we
+  // add characters to indicate what the phase of the other parent would be if
+  // which one is heteorzygous is flipped.
+  bool encounteredFirstFullP = false;
+  int lastChrIdx = -1;
   for(int m = 0; m < numMarkers; m++) {
     if (m > 0)
       fprintf(out, ","); // separate marker codes by commas
+
+    if (Marker::getMarker(m)->getChromIdx() != lastChrIdx) {
+      encounteredFirstFullP = false;
+      lastChrIdx = Marker::getMarker(m)->getChromIdx() != lastChrIdx;
+    }
 
     PhaseStatus status = _phase[m].status;
     switch(status) {
@@ -605,7 +639,22 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 	  fprintf(out, "[");
 	  bool somethingPrinted = false;
 	  if (_phase[m].arbitraryPar) {
-	    fprintf(out, "\"P\"");
+	    fprintf(out, "\"P");
+	    if (encounteredFirstFullP && _phase[m].hetParent < 2) {
+	      uint64_t iv = _phase[m].iv;
+	      if ((iv & 1) == ((iv >> 1) & 1))
+		// if the other parent is heterozygous, he/she has the same
+		// (_C_urrent) phase as that printed for the heterozygous parent
+		fprintf(out, "C");
+	      else
+		// if the other parent is heterozygous, he/she has the
+		// _A_lternate phase compared to that printed for the
+		// heterozygous parent
+		fprintf(out, "A");
+	    }
+	    encounteredFirstFullP = encounteredFirstFullP ||
+							_phase[m].hetParent < 2;
+	    fprintf(out, "\"");
 	    somethingPrinted = true;
 	  }
 
