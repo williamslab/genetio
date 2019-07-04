@@ -446,7 +446,7 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 	    uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
 					      isMissing * imputeParGeno;
 	    for(int hap = 0; hap < 2; hap++) {
-	      uint8_t curUntrans = (thisUntrans >> hap) & 1;
+	      uint8_t curUntrans = isMissing * (thisUntrans >> hap) & 1;
 	      // if untransmitted, then missing:
 	      uint8_t curGenoToPrint = (1 - curUntrans) * genoToPrint +
 							  curUntrans * G_MISS;
