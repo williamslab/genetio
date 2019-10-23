@@ -6,10 +6,13 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <zlib.h>
-#include <htslib/hts.h>
-#include <htslib/tbx.h>
 #include "dynarray.h"
 #include "hashtable.h"
+
+#ifdef VCF
+#include <htslib/hts.h>
+#include <htslib/tbx.h>
+#endif
 
 #ifndef PERSONIO_H
 #define PERSONIO_H
@@ -35,8 +38,10 @@ class PersonIO {
 			 int noFamilyId, FILE *log, bool allowEmptyParents,
 			 bool bulkData);
 
+#ifdef VCF
     static void readVCF(const char *vcfFile, const char *onlyChr, int startPos,
 			int endPos, const char *XcharName, FILE *log = NULL);
+#endif
 
     static void printEigenstratGeno(FILE *out);
     static void printEigenstratPhased(FILE *out, int numSamples = -1);
@@ -77,8 +82,10 @@ class PersonIO {
     static void parsePlinkBedFormat(FILE *in, FILE *outs[2]);
     static void readPlinkBedBulk(FILE *in, FILE *outs[2]);
     static void checkPlinkHeader(FILE *in, FILE *outs[2]);
+#ifdef VCF
     static void parseVCFGenotypes(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 				  const char *vcfFile, FILE *outs[2]);
+#endif
     static void parsePackedGenotypes(FILE *in, int recordLen, char *buf,
 				     int numIndivs, int type);
 };

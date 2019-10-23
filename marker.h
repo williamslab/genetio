@@ -6,10 +6,13 @@
 #include <stdint.h>
 #include <zlib.h>
 #include <string>
-#include <htslib/hts.h>
-#include <htslib/tbx.h>
 #include "hapi-ur-util.h"
 #include "dynarray.h"
+
+#ifdef VCF
+#include <htslib/hts.h>
+#include <htslib/tbx.h>
+#endif
 
 #ifndef MARKER_H
 #define MARKER_H
@@ -41,8 +44,10 @@ class Marker {
 			    int startPos, int endPos);
     static void readBIMFile(const char *bimFile, const char *onlyChr,
 			    int startPos, int endPos);
+#ifdef VCF
     static void readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 			    int startPos, int endPos);
+#endif
     static void printSNPFile(FILE *out);
     static void printMapFile(FILE *out);
     static void printImpute2Prefix(FILE *out, int markerNum);

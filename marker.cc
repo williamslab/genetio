@@ -55,6 +55,7 @@ void Marker::readBIMFile(const char *bimFile, const char *onlyChr, int startPos,
   fclose(in);
 }
 
+#ifdef VCF
 // Read markers from VCF file (which is required to be gzipped)
 void Marker::readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 			 int startPos, int endPos) {
@@ -194,6 +195,7 @@ void Marker::readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
     updateInfoPrevChrom(prevChromIdx, numMarkersCurChrom);
   }
 }
+#endif
 
 // Prints a .phsnp/.snp (PackedAncestryMap/Eigenstrat format) file
 void Marker::printSNPFile(FILE *out) {

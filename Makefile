@@ -21,6 +21,10 @@ ifdef PROFILE       # to use run `make PROFILE=1
   CFLAGS += -pg
 endif
 
+ifdef VCF
+  CFLAGS += -DVCF
+endif
+
 CPPFLAGS = -std=c++0x $(CFLAGS)
 
 # dependency variables / commands

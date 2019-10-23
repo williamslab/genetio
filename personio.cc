@@ -6,11 +6,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <cmath>
-#include <htslib/hts.h>
-#include <htslib/hfile.h>
-#include <htslib/vcf.h>
-#include <htslib/tbx.h>
-#include <htslib/bgzf.h>
 #include <stdint.h>
 #include "personio.h"
 #include "personbits.h"
@@ -18,6 +13,12 @@
 #include "personhapbits.h"
 #include "marker.h"
 #include "util.h"
+
+#ifdef VCF
+#include <htslib/hfile.h>
+#include <htslib/vcf.h>
+#include <htslib/bgzf.h>
+#endif
 
 // Method to read data stored in the various supported types. Detects the file
 // type and calls the appropriate methods to parse them.
@@ -56,12 +57,16 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   bool bulkData) {
   P::init();
 
+  FILE *outs[2] = { stdout, log };
+
   if (vcfInput) {
+#ifdef VCF
     readVCF(genoFile, onlyChr, startPos, endPos, XchrName, log);
     return;
+#else
+    mult_printf(outs, "ERROR: attempt to read VCF input, but genetio was not compiled with -DVCF\n");
+#endif
   }
-
-  FILE *outs[2] = { stdout, log };
 
   // Not VCF input:
   // open genotype file and determine file type:
@@ -259,6 +264,7 @@ int PersonIO<P>::getGenoFileType(FILE *genoIn, bool phased, FILE *outs[2]) {
   return fileType;
 }
 
+#ifdef VCF
 // Method to read data stored in a VCF file.
 // <vcfFile> is the filename for the VCF file
 // <onlyChr> if non-NULL, is the name of the specific chromosome that should
@@ -461,6 +467,7 @@ void PersonIO<P>::readVCF(const char *vcfFile, const char *onlyChr,
     }
   }
 }
+#endif // VCF
 
 // Reads the individual file <filename> and stores the resulting individual
 // records in <P::_allIndivs>.
@@ -1396,6 +1403,7 @@ void PersonIO<P>::checkPlinkHeader(FILE *in, FILE *outs[2]) {
   }
 }
 
+#ifdef VCF
 // Parses genotypes only (not marker information, which is done in the Marker
 // class) from a VCF format input stream in <vcfIn>
 template <class P>
@@ -1628,6 +1636,7 @@ void PersonIO<P>::parseVCFGenotypes(htsFile *vcfIn, tbx_t *index,
     }
   }
 }
+#endif
 
 // Prints an eigenstrat-format .geno file to <out>
 template <class P>
