@@ -991,7 +991,9 @@ void PersonIO<P>::parsePackedAncestryMapFormat(FILE *in) {
   // file specified num indivs, file specified num markers, hash codes
   int fNumIndivs, fNumMarkers, ihash, shash;
 
-  int bytesPerSNP = std::ceil( ((float) numIndivs * 2) / (8 * sizeof(char)) );
+  // add 3 so that we get ceil(numIndivs / 4.0); the 4 is really * 2 / 8: two
+  // bits per sample; 8 bits per byte
+  int bytesPerSNP = (numIndivs + 3) / 4;
   int recordLen = max(bytesPerSNP, 48);
   char *buf = new char[recordLen];
 
@@ -1349,7 +1351,9 @@ void PersonIO<P>::parsePlinkBedFormat(FILE *in, FILE *outs[2]) {
 
   assert(sizeof(char) == 1); // I think this will always hold...
 
-  int bytesPerSNP = std::ceil( ((float) numIndivs * 2) / (8 * sizeof(char)) );
+  // add 3 so that we get ceil(numIndivs / 4.0); the 4 is really * 2 / 8: two
+  // bits per sample; 8 bits per byte
+  int bytesPerSNP = (numIndivs + 3) / 4;
   int recordLen = bytesPerSNP;
   char *buf = new char[recordLen];
 
@@ -1385,7 +1389,9 @@ void PersonIO<P>::readPlinkBedBulk(FILE *in, FILE *outs[2]) {
   uint8_t *&data = *dataPtr;
 
   static_assert(sizeof(uint8_t) == 1, "expect 8 bits to be 1 byte");
-  bytesPerMarker = std::ceil( ((float) numIndivs * 2) / (8 * sizeof(char)) );
+  // add 3 so that we get ceil(numIndivs / 4.0); the 4 is really * 2 / 8: two
+  // bits per sample; 8 bits per byte
+  bytesPerMarker = (numIndivs + 3) / 4;
   uint64_t allocBytes = (uint64_t) bytesPerMarker * numMarkersToStore;
   data = new uint8_t[ allocBytes ];
 
