@@ -10,6 +10,7 @@
 #include "personio.h"
 #include "personbits.h"
 #include "personbulk.h"
+#include "personloopdata.h"
 #include "personhapbits.h"
 #include "marker.h"
 #include "util.h"
@@ -19,6 +20,15 @@
 #include <htslib/vcf.h>
 #include <htslib/bgzf.h>
 #endif
+
+////////////////////////////////////////////////////////////////////////////////
+// initialize static members
+template<class P>
+FILE *PersonIO<P>::_loopGenoIn = NULL;
+template<class P>
+int   PersonIO<P>::_curLoopMarker = -1;
+template<class P>
+int   PersonIO<P>::_curOmitIdx = 0;
 
 // Method to read data stored in the various supported types. Detects the file
 // type and calls the appropriate methods to parse them.
@@ -47,6 +57,10 @@
 //            block. As of now, only PersonBulk supports this, and calls with
 //            other Person* classes will fail. Additionally, only PLINK bed
 //            format data are supported.
+// <loopData> does not initially parse genotype data, but prepares to read it
+//            one "row" (SNP) at a time. This works currently with
+//            PersonLoopData, and calls to other Person* classes will fail.
+//            Currently only PLINK bed format data are supported.
 template <class P>
 void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, const char *onlyChr,
@@ -54,7 +68,7 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   int noFamilyId, bool vcfInput, bool printTrioKids,
 			   FILE *log, bool phased, int **numMendelError,
 			   int **numMendelCounted, bool allowEmptyParents,
-			   bool bulkData) {
+			   bool bulkData, bool loopData) {
   P::init();
 
   FILE *outs[2] = { stdout, log };
@@ -76,6 +90,16 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
   if (bulkData && fileType != 2) {
     mult_printf(outs, "ERROR: attempt to read bulk data for non-PLINK bed format data\n");
     exit(7);
+  }
+  else if (loopData) {
+    if (fileType != 2) {
+      mult_printf(outs, "ERROR: attempt to read genotype data by looping for non-PLINK bed format data\n");
+      exit(7);
+    }
+    else if (!std::is_same<P, PersonLoopData>::value) {
+      mult_printf(outs, "ERROR: attempt to read genotype data by looping without using PersonLoopData person type\n");
+      exit(5);
+    }
   }
 
   ///////////////////////////////////////////////////////////////////////
@@ -138,6 +162,16 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 
   if (bulkData) {
     readPlinkBedBulk(genoIn, outs);
+
+    mult_printf(outs, "done.\n");
+    fclose(genoIn);
+  }
+  else if (loopData) {
+    checkPlinkHeader(genoIn, outs);
+    // setup for call to readGenoRow():
+    _loopGenoIn = genoIn;
+
+    mult_printf(outs, "initiated, to complete later.\n");
   }
   else {
     if (fileType == 0) {
@@ -150,11 +184,11 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
       assert(fileType == 2);
       parsePlinkBedFormat(genoIn, outs);
     }
+
+    mult_printf(outs, "done.\n");
+    fclose(genoIn);
   }
 
-  mult_printf(outs, "done.\n");
-
-  fclose(genoIn);
 
   if (analyzingX) {
     // Set any heterozygous sites on the X to missing in males:
@@ -1387,6 +1421,60 @@ void PersonIO<P>::readPlinkBedBulk(FILE *in, FILE *outs[2]) {
   }
 }
 
+// Reads one "row" -- one marker -- from the input genotype data. To use this
+// function, must first call readData() with the <loopData> option set true.
+// The <data> variable must be a pointer to a block of memory of size
+// <bytesPerMarker>.
+template <class P>
+int PersonIO<P>::readGenoRow(uint8_t * &data, int bytesPerMarker) {
+  if (!_loopGenoIn) {
+      fprintf(stderr, "\nERROR reading one row of genotype data: no file open to read\n");
+      exit(1);
+  }
+
+  // On first call to this function, skip some initial SNPs (such as when
+  // reading a specific chromosome) by seek to the proper position in the file
+  if (_curLoopMarker == -1) { // first call
+    _curLoopMarker = 0;
+    int err = fseek(_loopGenoIn,
+		    bytesPerMarker * Marker::getFirstStoredMarkerFileIdx(),
+		    SEEK_CUR);
+    if (err) {
+      fprintf(stderr, "ERROR reading data: unable to seek\n");
+      exit(2);
+    }
+  }
+
+  const dynarray<int> &omitMarkers = Marker::getMarkersToOmit();
+  int nextToOmitIdx =
+	  (omitMarkers.length() > _curOmitIdx) ? omitMarkers[_curOmitIdx] : -1;
+
+  while (_curLoopMarker == nextToOmitIdx) {
+    // skip this marker
+    _curOmitIdx++;
+    nextToOmitIdx =
+	  (omitMarkers.length() > _curOmitIdx) ? omitMarkers[_curOmitIdx] : -1;
+    int err = fseek(_loopGenoIn, bytesPerMarker, SEEK_CUR);
+    if (err) {
+      fprintf(stderr, "ERROR reading data: unable to seek\n");
+      exit(3);
+    }
+    _curLoopMarker++;
+  }
+
+  _curLoopMarker++; // about to read a marker: update for next call
+  int ret = fread(&data, bytesPerMarker, sizeof(uint8_t), _loopGenoIn);
+  if (ret == 0) {
+    // in principle, reached the end of the file, so close
+    // otherwise some issue: let caller know there's nothing more to process
+    // (if caller loops again, will get error):
+    fclose(_loopGenoIn);
+    _loopGenoIn = NULL;
+  }
+
+  return ret;
+}
+
 // Reads the entire PLINK .bed format data into one large chunk without further
 // processing. Currently only PersonBulk supports this storage format.
 template <class P>
@@ -2035,4 +2123,5 @@ void PersonIO<P>::printImpute2SampleFile(FILE *out, bool trioDuoOnly) {
 // linker errors
 template class PersonIO<PersonBits>;
 template class PersonIO<PersonBulk>;
+template class PersonIO<PersonLoopData>;
 template class PersonIO<PersonHapBits>;

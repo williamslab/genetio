@@ -1,4 +1,4 @@
-CPPSRCS= marker.cc util.cc hapi-ur-util.cc personio.cc personbits.cc superperson.cc personbulk.cc personhapbits.cc nuclearfamily.cc
+CPPSRCS= marker.cc util.cc hapi-ur-util.cc personio.cc personbits.cc superperson.cc personbulk.cc personhapbits.cc nuclearfamily.cc personloopdata.cc
 CSRCS= 
 OBJS= $(patsubst %.cc,%.o,$(CPPSRCS)) $(patsubst %.c,%.o,$(CSRCS))
 LIB= libgenetio.a

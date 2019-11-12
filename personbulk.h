@@ -125,7 +125,7 @@ class PersonBulk : public SuperPerson {
 
     void setGenotype(int hapChunkNum, int chunkIdx, int chromIdx,
 		     int chromMarkerIdx, int geno[2]) {
-      fprintf(stderr, "ERROR: PersonBulk objects do store genotype data in bulk; cannot set specific genotype values\n");
+      fprintf(stderr, "ERROR: PersonBulk objects store genotype data in bulk; cannot set specific genotype values\n");
       exit(9);
     }
     void setParents(char *familyid, PersonBulk *parents[2],

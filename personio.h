@@ -31,7 +31,8 @@ class PersonIO {
 			 bool printTrioKids = false, FILE *log = NULL,
 			 bool phased = false, int **numMendelError = NULL,
 			 int **numMendelCounted = NULL,
-			 bool allowEmptyParents = false, bool bulkdata = false);
+			 bool allowEmptyParents = false, bool bulkData = false,
+			 bool loopData = false);
     static void readData(const char *genoFile, const char *markerFile,
 			 const char *indFile, const char *onlyChr,
 			 int startPos, int endPos, const char *XchrName,
@@ -42,6 +43,8 @@ class PersonIO {
     static void readVCF(const char *vcfFile, const char *onlyChr, int startPos,
 			int endPos, const char *XcharName, FILE *log = NULL);
 #endif
+
+    static int readGenoRow(uint8_t * &data, int bytesPerMarker);
 
     static void printEigenstratGeno(FILE *out);
     static void printEigenstratPhased(FILE *out, int numSamples = -1);
@@ -88,6 +91,15 @@ class PersonIO {
 #endif
     static void parsePackedGenotypes(FILE *in, int recordLen, char *buf,
 				     int numIndivs, int type);
+
+    //////////////////////////////////////////////////////////////////
+    // private static variables
+    //////////////////////////////////////////////////////////////////
+
+    // for use with readGenoRow()
+    static FILE *_loopGenoIn;
+    static int   _curLoopMarker;
+    static int   _curOmitIdx;
 };
 
 #endif // PERSONIO_H
