@@ -102,6 +102,11 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
     }
   }
 
+  if (bulkData && loopData) {
+    mult_printf(outs, "ERROR: attempt to read data both in bulk and by looping; choose one or neither\n");
+    exit(7);
+  }
+
   ///////////////////////////////////////////////////////////////////////
   // Parse SNP file:
 
@@ -259,11 +264,12 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, const char *onlyChr,
 			   int startPos, int endPos, const char *XchrName,
 			   int noFamilyId, FILE *log, bool allowEmptyParents,
-			   bool bulkData) {
+			   bool bulkData, bool loopData) {
   readData(genoFile, markerFile, indFile, onlyChr, startPos, endPos,
 	   XchrName, noFamilyId, /*vcfInput=*/ false, /*printTrioKids=*/ false,
 	   log, /*phased=*/ false, /*numMendelError=*/ NULL,
-	   /*numMendelCounted=*/ NULL, allowEmptyParents, bulkData);
+	   /*numMendelCounted=*/ NULL, allowEmptyParents, bulkData,
+	   loopData);
 }
 
 // Returns an integer representing the type of genotype file contained in the

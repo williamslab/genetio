@@ -37,7 +37,7 @@ class PersonIO {
 			 const char *indFile, const char *onlyChr,
 			 int startPos, int endPos, const char *XchrName,
 			 int noFamilyId, FILE *log, bool allowEmptyParents,
-			 bool bulkData);
+			 bool bulkData, bool loopData = false);
 
 #ifdef VCF
     static void readVCF(const char *vcfFile, const char *onlyChr, int startPos,
