@@ -1448,12 +1448,14 @@ int PersonIO<P>::readGenoRow(uint8_t * &data, int bytesPerMarker) {
   // reading a specific chromosome) by seek to the proper position in the file
   if (_curLoopMarker == -1) { // first call
     _curLoopMarker = 0;
-    int err = fseek(_loopGenoIn,
-		    bytesPerMarker * Marker::getFirstStoredMarkerFileIdx(),
-		    SEEK_CUR);
-    if (err) {
-      fprintf(stderr, "ERROR reading data: unable to seek\n");
-      exit(2);
+    if (Marker::getFirstStoredMarkerFileIdx() > 0) {
+      int err = fseek(_loopGenoIn,
+		      bytesPerMarker * Marker::getFirstStoredMarkerFileIdx(),
+		      SEEK_CUR);
+      if (err) {
+	fprintf(stderr, "ERROR reading data: unable to seek\n");
+	exit(2);
+      }
     }
   }
 
@@ -1474,8 +1476,8 @@ int PersonIO<P>::readGenoRow(uint8_t * &data, int bytesPerMarker) {
     _curLoopMarker++;
   }
 
-  _curLoopMarker++; // about to read a marker: update for next call
-  int ret = fread(&data, bytesPerMarker, sizeof(uint8_t), _loopGenoIn);
+  int ret = fread(data, bytesPerMarker, sizeof(uint8_t), _loopGenoIn);
+  _curLoopMarker++;
   if (ret == 0) {
     // in principle, reached the end of the file, so close
     // otherwise some issue: let caller know there's nothing more to process
