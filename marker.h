@@ -81,6 +81,13 @@ class Marker {
     // cheating in order to set allele frequencies and/or add alleles for .ped:
     static Marker * getMarkerNonConst(int num) { return _allMarkers[num]; }
 
+    static void convertMapTocM() {
+      int numMarkers = getNumMarkers();
+      for(int m = 0; m < numMarkers; m++) {
+	_allMarkers[m]->_mapPos *= 100;
+      }
+    }
+
     static int    getNumWindows() { return _hapWindowEnds.length(); }
     static int    getWindowEndMarker(int wind) { return _hapWindowEnds[wind]; }
     static float  getWindowMapCenter(int wind)
