@@ -1478,15 +1478,20 @@ int PersonIO<P>::readGenoRow(uint8_t * &data, int bytesPerMarker) {
 
   int ret = fread(data, bytesPerMarker, sizeof(uint8_t), _loopGenoIn);
   _curLoopMarker++;
-  if (ret == 0) {
-    // in principle, reached the end of the file, so close
-    // otherwise some issue: let caller know there's nothing more to process
-    // (if caller loops again, will get error):
-    fclose(_loopGenoIn);
-    _loopGenoIn = NULL;
-  }
 
   return ret;
+}
+
+// For use with readGenoRow() -- closes the input file after finished
+template <class P>
+void PersonIO<P>::closeGeno() {
+  if (!_loopGenoIn) {
+      fprintf(stderr, "\nERROR reading one row of genotype data: no file open to read\n");
+      exit(1);
+  }
+
+  fclose(_loopGenoIn);
+  _loopGenoIn = NULL;
 }
 
 // Reads the entire PLINK .bed format data into one large chunk without further

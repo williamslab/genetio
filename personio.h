@@ -44,7 +44,8 @@ class PersonIO {
 			int endPos, const char *XcharName, FILE *log = NULL);
 #endif
 
-    static int readGenoRow(uint8_t * &data, int bytesPerMarker);
+    static int  readGenoRow(uint8_t * &data, int bytesPerMarker);
+    static void closeGeno();
 
     static void printEigenstratGeno(FILE *out);
     static void printEigenstratPhased(FILE *out, int numSamples = -1);
