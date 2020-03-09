@@ -68,7 +68,7 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   int noFamilyId, bool vcfInput, bool printTrioKids,
 			   FILE *log, bool phased, int **numMendelError,
 			   int **numMendelCounted, bool allowEmptyParents,
-			   bool bulkData, bool loopData) {
+			   bool bulkData, bool loopData, bool useParents) {
   P::init();
 
   FILE *outs[2] = { stdout, log };
@@ -238,7 +238,7 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
     }
   }
 
-  if (mightHaveParents) {
+  if (useParents && mightHaveParents) {
     mult_printf(outs,"Rereading fam file to identify family relationships... ");
 
     findRelationships(indivIn, log, noFamilyId,
@@ -264,12 +264,12 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, const char *onlyChr,
 			   int startPos, int endPos, const char *XchrName,
 			   int noFamilyId, FILE *log, bool allowEmptyParents,
-			   bool bulkData, bool loopData) {
+			   bool bulkData, bool loopData, bool useParents) {
   readData(genoFile, markerFile, indFile, onlyChr, startPos, endPos,
 	   XchrName, noFamilyId, /*vcfInput=*/ false, /*printTrioKids=*/ false,
 	   log, /*phased=*/ false, /*numMendelError=*/ NULL,
 	   /*numMendelCounted=*/ NULL, allowEmptyParents, bulkData,
-	   loopData);
+	   loopData, useParents);
 }
 
 // Returns an integer representing the type of genotype file contained in the
