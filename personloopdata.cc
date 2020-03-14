@@ -11,22 +11,21 @@
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
 dynarray<PersonLoopData *> PersonLoopData::_allIndivs;
-Hashtable<char *, PersonLoopData *> PersonLoopData::_idToPerson(2003,
-							stringHash,
-							stringcmp);
+std::unordered_map<const char *, PersonLoopData *, HashString, EqualString>
+								    _idToPerson;
 
 PersonLoopData::PersonLoopData(char *id, char sex, int popIndex,
 				   uint32_t sampNum, short familyIdLength) :
 		     SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
-    if (_idToPerson.lookup(_id)) {
+    if (_idToPerson.find(_id) != _idToPerson.end()) {
       fprintf(stderr, "\nERROR: multiple individuals with id %s!\n", _id);
       exit(3);
     }
 
     _sampNum = sampNum;
 
-    _idToPerson.add(_id, this);
+    _idToPerson[_id] = this;
   }
 }
 

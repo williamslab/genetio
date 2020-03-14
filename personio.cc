@@ -69,8 +69,6 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   FILE *log, bool phased, int **numMendelError,
 			   int **numMendelCounted, bool allowEmptyParents,
 			   bool bulkData, bool loopData, bool useParents) {
-  P::init();
-
   FILE *outs[2] = { stdout, log };
 
   if (vcfInput) {
@@ -850,7 +848,8 @@ void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
     // do we have genotype data for the non-zero parents?  how many parents?
     int numParents = 0;
     bool missingParents = false;
-    char fullid[162];
+    const int ID_SIZE = 162;
+    char fullid[ID_SIZE];
     P *parents[2] = { NULL, NULL };
     for(int p = 0; p < 2; p++) {
       if (strcmp(parentsids[p], "0") == 0)
@@ -864,7 +863,11 @@ void PersonIO<P>::findRelationships(FILE *in, FILE *log, bool omitFamilyId,
 	curParId = parentsids[p];
       }
       else {
-	sprintf(fullid, "%s:%s", familyid, parentsids[p]);
+	int ret = snprintf(fullid, ID_SIZE, "%s:%s", familyid, parentsids[p]);
+	if (ret <= 0) {
+	  fprintf(stderr, "ERROR: couldn't write family and individual id\n");
+	  exit(5);
+	}
 	curParId = fullid;
 	familyIdLength = strlen(familyid);
       }

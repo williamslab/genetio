@@ -40,16 +40,6 @@ bool pairIntEqualFunc(const PairIdx<int> &v1, const PairIdx<int> &v2) {
   return v1[0] == v2[0] && v1[1] == v2[1];
 }
 
-int stringHash(char * const &key) {
-  int sum = 0;
-  int strlength = strlen(key);
-  for(int i = 0; i < strlength; i++) {
-    sum *= 7;
-    sum += key[i];
-  }
-  return sum;
-}
-
 bool stringcmp(char * const &s1, char * const &s2) {
     return strcmp(s1, s2) == 0;
 }

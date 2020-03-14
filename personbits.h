@@ -5,11 +5,12 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <unordered_map>
+#include "util.h"
 #include "hapi-ur-util.h"
 #include "superperson.h"
 #include "personio.h"
 #include "dynarray.h"
-#include "hashtable.h"
 
 #ifndef PERSONBITS_H
 #define PERSONBITS_H
@@ -57,13 +58,17 @@ class PersonBits : public SuperPerson {
     // public static methods
     //////////////////////////////////////////////////////////////////
 
-    static void init() { }
-
     static void printTrioEigenstratPhased(FILE *out);
 
     static void initRandSampledHaps();
 
-    static PersonBits * lookupId(char *id) { return _idToPerson.lookup(id); }
+    static PersonBits * lookupId(char *id) {
+      auto entry = _idToPerson.find(id);
+      if (entry == _idToPerson.end())
+	return NULL;
+      else
+	return entry->second;
+    }
 
     static void getBulkContainers(uint8_t **&bulk_data, int *&bytesPerMarker) {
       // This class does not support bulk data storage
@@ -164,7 +169,8 @@ class PersonBits : public SuperPerson {
 
     static dynarray<PersonBits *> _allIndivs;
     // Hash from PersonBits ids to PersonBits *
-    static Hashtable<char *, PersonBits *> _idToPerson;
+    static std::unordered_map<const char *, PersonBits *,
+			      HashString, EqualString> _idToPerson;
     static int _numDuos;
     static int _numTrioKids;
 

@@ -15,8 +15,8 @@
 int PersonBits::_numDuos = 0;
 int PersonBits::_numTrioKids = 0;
 dynarray<PersonBits *> PersonBits::_allIndivs;
-Hashtable<char *, PersonBits *> PersonBits::_idToPerson(2003, stringHash,
-							stringcmp);
+std::unordered_map<const char *, PersonBits *, HashString, EqualString>
+								    _idToPerson;
 
 PersonBits::PersonBits(char *id, char sex, int popIndex, uint32_t sampNum,
 		       short familyIdLength) :
@@ -42,12 +42,12 @@ PersonBits::PersonBits(char *id, char sex, int popIndex, uint32_t sampNum,
 
     _sampledHaplotypes = NULL;
 
-    if (_idToPerson.lookup(_id)) {
+    if (_idToPerson.find(_id) != _idToPerson.end()) {
       fprintf(stderr, "\nERROR: multiple individuals with id %s!\n", _id);
       exit(3);
     }
 
-    _idToPerson.add(_id, this);
+    _idToPerson[_id] = this;
   }
 }
 

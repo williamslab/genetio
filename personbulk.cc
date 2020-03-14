@@ -12,27 +12,23 @@
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
 dynarray<PersonBulk *> PersonBulk::_allIndivs;
-Hashtable<char *, PersonBulk *> PersonBulk::_idToPerson(2003, stringHash,
-							stringcmp);
+std::unordered_map<const char *, PersonBulk *, HashString, EqualString>
+								    _idToPerson;
 uint8_t *PersonBulk::_data;
 int      PersonBulk::_bytesPerMarker;
-
-void PersonBulk::init() {
-  NuclearFamily::init();
-}
 
 PersonBulk::PersonBulk(char *id, char sex, int popIndex, uint32_t sampNum,
 		       short familyIdLength) :
 		     SuperPerson(id, sex, popIndex, familyIdLength) {
   if (!_ignore) {
-    if (_idToPerson.lookup(_id)) {
+    if (_idToPerson.find(_id) != _idToPerson.end()) {
       fprintf(stderr, "\nERROR: multiple individuals with id %s!\n", _id);
       exit(3);
     }
 
     _sampNum = sampNum;
 
-    _idToPerson.add(_id, this);
+    _idToPerson[_id] = this;
   }
 }
 

@@ -10,8 +10,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 // initialize static members
 dynarray<PersonHapBits *> PersonHapBits::_allIndivs;
-Hashtable<char *, PersonHapBits *> PersonHapBits::_idToPerson(2003, stringHash,
-							      stringcmp);
+std::unordered_map<const char *, PersonHapBits *, HashString, EqualString>
+								    _idToPerson;
 
 PersonHapBits::PersonHapBits(char *id, char sex, int popIndex, uint32_t sampNum,
 			     short familyIdLength) :
@@ -28,12 +28,12 @@ PersonHapBits::PersonHapBits(char *id, char sex, int popIndex, uint32_t sampNum,
       }
     }
 
-    if (_idToPerson.lookup(_id)) {
+    if (_idToPerson.find(_id) != _idToPerson.end()) {
       fprintf(stderr, "\nERROR: multiple individuals with id %s!\n", _id);
       exit(3);
     }
 
-    _idToPerson.add(_id, this);
+    _idToPerson[_id] = this;
   }
 }
 

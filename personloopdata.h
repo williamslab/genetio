@@ -4,10 +4,12 @@
 // This program is distributed under the terms of the GNU General Public License
 
 #include <stdio.h>
+#include <unordered_map>
 #include "marker.h"
 #include "superperson.h"
 #include "personio.h"
 #include "dynarray.h"
+#include "util.h"
 
 #ifndef PERSONLOOPDATA_H
 #define PERSONLOOPDATA_H
@@ -18,10 +20,12 @@ class PersonLoopData : public SuperPerson {
     // public static methods
     //////////////////////////////////////////////////////////////////
 
-    static void init() { }
-
     static PersonLoopData * lookupId(char *id) {
-      return _idToPerson.lookup(id);
+      auto entry = _idToPerson.find(id);
+      if (entry == _idToPerson.end())
+	return NULL;
+      else
+	return entry->second;
     }
 
     static void getBulkContainers(uint8_t **&bulk_data, int *&bytesPerMarker) {
@@ -58,7 +62,8 @@ class PersonLoopData : public SuperPerson {
 
     static dynarray<PersonLoopData *> _allIndivs;
     // Hash from PersonLoopData ids to PersonLoopData *
-    static Hashtable<char *, PersonLoopData *> _idToPerson;
+    static std::unordered_map<const char *, PersonLoopData *,
+			      HashString, EqualString> _idToPerson;
 
   private:
     //////////////////////////////////////////////////////////////////

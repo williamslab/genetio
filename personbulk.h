@@ -4,12 +4,12 @@
 // This program is distributed under the terms of the GNU General Public License
 
 #include <stdio.h>
-#include <sparsehash/dense_hash_map>
-#include <tr1/hashtable.h>
+#include <unordered_map>
 #include "marker.h"
 #include "superperson.h"
 #include "personio.h"
 #include "dynarray.h"
+#include "util.h"
 
 #ifndef PERSONBULK_H
 #define PERSONBULK_H
@@ -33,9 +33,13 @@ class PersonBulk : public SuperPerson {
     // public static methods
     //////////////////////////////////////////////////////////////////
 
-    static void init();
-
-    static PersonBulk * lookupId(char *id) { return _idToPerson.lookup(id); }
+    static PersonBulk * lookupId(char *id) {
+      auto entry = _idToPerson.find(id);
+      if (entry == _idToPerson.end())
+	return NULL;
+      else
+	return entry->second;
+    }
 
     static void getBulkContainers(uint8_t **&bulk_data, int *&bytesPerMarker) {
       bulk_data = &_data;
@@ -90,7 +94,8 @@ class PersonBulk : public SuperPerson {
 
     static dynarray<PersonBulk *> _allIndivs;
     // Hash from PersonBulk ids to PersonBulk *
-    static Hashtable<char *, PersonBulk *> _idToPerson;
+    static std::unordered_map<const char *, PersonBulk *,
+			      HashString, EqualString> _idToPerson;
 
   private:
     //////////////////////////////////////////////////////////////////

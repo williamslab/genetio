@@ -4,9 +4,11 @@
 // This program is distributed under the terms of the GNU General Public License
 
 #include <stdint.h>
+#include <unordered_map>
 #include "marker.h"
 #include "superperson.h"
 #include "personio.h"
+#include "util.h"
 
 #ifndef PERSONHAPBITS_H
 #define PERSONHAPBITS_H
@@ -17,9 +19,13 @@ class PersonHapBits : public SuperPerson {
     // public static methods
     //////////////////////////////////////////////////////////////////
 
-    static void init() { }
-
-    static PersonHapBits * lookupId(char *id) { return _idToPerson.lookup(id); }
+    static PersonHapBits * lookupId(char *id) {
+      auto entry = _idToPerson.find(id);
+      if (entry == _idToPerson.end())
+	return NULL;
+      else
+	return entry->second;
+    }
 
     static void getBulkContainers(uint8_t **&bulk_data, int *&bytesPerMarker) {
       // This class does not support bulk data storage
@@ -58,7 +64,8 @@ class PersonHapBits : public SuperPerson {
 
     static dynarray<PersonHapBits *> _allIndivs;
     // Hash from PersonHapBits ids to PersonHapBits *
-    static Hashtable<char *, PersonHapBits *> _idToPerson;
+    static std::unordered_map<const char *, PersonHapBits *,
+			      HashString, EqualString> _idToPerson;
 
   private:
     //////////////////////////////////////////////////////////////////

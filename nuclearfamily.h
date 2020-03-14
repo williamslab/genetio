@@ -3,6 +3,7 @@
 //
 // This program is distributed under the terms of the GNU General Public License
 
+#include <unordered_map>
 #include "personbulk.h"
 #include "dynarray.h"
 
@@ -70,31 +71,27 @@ class NuclearFamily {
 
     typedef typename std::pair<PersonBulk*,PersonBulk*>* par_pair; //parent pair
     typedef typename std::pair<PersonBulk*,PersonBulk*> par_pair_real;
-    struct eqParPair {
+    struct EqParPair {
       bool operator()(const par_pair k1, const par_pair k2) const {
 	return k1 == k2 || (k1 && k2 && k1->first == k2->first &&
 						      k1->second == k2->second);
       }
     };
-    struct hashParPair {
+    struct HashParPair {
       size_t operator()(NuclearFamily::par_pair const key) const {
 	// make a better hash function?
-	return std::tr1::hash<PersonBulk*>{}(key->first) +
-	       std::tr1::hash<PersonBulk*>{}(key->second);
+	return std::hash<PersonBulk*>{}(key->first) +
+	       std::hash<PersonBulk*>{}(key->second);
       }
     };
-    typedef typename google::dense_hash_map<par_pair, NuclearFamily *,
-					    hashParPair, eqParPair> fam_ht;
-    typedef typename fam_ht::const_iterator fam_ht_iter;
+    typedef std::unordered_map<par_pair, NuclearFamily *,
+			       HashParPair, EqParPair> fam_ht;
+    typedef fam_ht::const_iterator fam_ht_iter;
 
 
     //////////////////////////////////////////////////////////////////
     // public static methods
     //////////////////////////////////////////////////////////////////
-
-    static void init() {
-      _families.set_empty_key(NULL);
-    }
 
     static void addChild(PersonBulk *parents[2], PersonBulk *child);
 

@@ -8,6 +8,8 @@
 #include <sys/time.h>
 #include <random>
 #include <bitset>
+#include <functional>
+#include <cstring>
 
 #ifndef UTIL_H
 #define UTIL_H
@@ -65,8 +67,38 @@ int  intHashFunc(const int &key);
 bool intEqualFunc(const int &v1, const int &v2);
 int  pairIntHashFunc(const PairIdx<int> &key);
 bool pairIntEqualFunc(const PairIdx<int> &v1, const PairIdx<int> &v2);
-int  stringHash(char * const &key);
 bool stringcmp(char * const &s1, char * const &s2);
+
+struct LesserString {
+  bool operator() (const char *lhs, const char *rhs) const {
+    return strcmp(lhs, rhs) < 0;
+  }
+};
+
+struct HashString {
+  size_t operator() (const char *s) const {
+    // got the hash from stack overflow and changed macros to constants
+    // https://stackoverflow.com/questions/8317508/hash-function-for-a-string
+    const int A = 54059; /* a prime */
+    const int B = 76963; /* another prime */
+    //const int C = 86969; /* yet another prime */
+    const int FIRSTH = 37; /* also prime */
+
+    size_t h = FIRSTH;
+    while (*s) {
+      h = (h * A) ^ (s[0] * B);
+      s++;
+    }
+
+    return h; // or return h % C;
+  }
+};
+
+struct EqualString {
+  bool operator() (const char *lhs, const char *rhs) const {
+    return !strcmp(lhs, rhs);
+  }
+};
 
 inline int getNumDigits(int val) {
   int ct;
