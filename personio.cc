@@ -2143,7 +2143,9 @@ void PersonIO<P>::printImpute2SampleFile(FILE *out, bool trioDuoOnly) {
 
 // explicitly instantiate PersionIO with the Person classes so we don't get
 // linker errors
+#ifdef HAPIUR
 template class PersonIO<PersonBits>;
+template class PersonIO<PersonHapBits>;
+#endif
 template class PersonIO<PersonBulk>;
 template class PersonIO<PersonLoopData>;
-template class PersonIO<PersonHapBits>;
