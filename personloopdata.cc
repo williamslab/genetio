@@ -12,7 +12,7 @@
 // initialize static members
 dynarray<PersonLoopData *> PersonLoopData::_allIndivs;
 std::unordered_map<const char *, PersonLoopData *, HashString, EqualString>
-								    _idToPerson;
+						    PersonLoopData::_idToPerson;
 
 PersonLoopData::PersonLoopData(char *id, char sex, int popIndex,
 				   uint32_t sampNum, short familyIdLength) :

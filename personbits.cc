@@ -16,7 +16,7 @@ int PersonBits::_numDuos = 0;
 int PersonBits::_numTrioKids = 0;
 dynarray<PersonBits *> PersonBits::_allIndivs;
 std::unordered_map<const char *, PersonBits *, HashString, EqualString>
-								    _idToPerson;
+							PersonBits::_idToPerson;
 
 PersonBits::PersonBits(char *id, char sex, int popIndex, uint32_t sampNum,
 		       short familyIdLength) :

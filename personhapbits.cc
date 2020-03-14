@@ -11,7 +11,7 @@
 // initialize static members
 dynarray<PersonHapBits *> PersonHapBits::_allIndivs;
 std::unordered_map<const char *, PersonHapBits *, HashString, EqualString>
-								    _idToPerson;
+						    PersonHapBits::_idToPerson;
 
 PersonHapBits::PersonHapBits(char *id, char sex, int popIndex, uint32_t sampNum,
 			     short familyIdLength) :

@@ -13,7 +13,7 @@
 // initialize static members
 dynarray<PersonBulk *> PersonBulk::_allIndivs;
 std::unordered_map<const char *, PersonBulk *, HashString, EqualString>
-								    _idToPerson;
+							PersonBulk::_idToPerson;
 uint8_t *PersonBulk::_data;
 int      PersonBulk::_bytesPerMarker;
 
