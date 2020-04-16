@@ -870,6 +870,88 @@ void NuclearFamily::getParAlleles(int marker, uint8_t parAlleleIdx[2][2]) {
 	}
       }
     }
+    // Get the ambiguous phase swap types for when both parents are heterozygous
+    // If a given parent can be phased in the opposite way, their phase/alleles
+    // are completely ambiguous
+    uint8_t bothParHetAmbigPhase = _phase[marker].ambigParPhase >> 4;
+    uint8_t diff = 0;
+    switch (bothParHetAmbigPhase) {
+      case 0: // no both par het ambiguous phase: diff == 0
+	break;
+      // only a single bit in the ambiguous value cases:
+      case 1:
+	diff = 0 ^ _phase[marker].parentPhase;
+	break;
+      case 2:
+	diff = 1 ^ _phase[marker].parentPhase;
+	break;
+      case 4:
+	diff = 2 ^ _phase[marker].parentPhase;
+	break;
+      case 8:
+	diff = 3 ^ _phase[marker].parentPhase;
+	break;
+	// two bits in the ambiguous value cases:
+      case 3:
+	diff = (0 ^ _phase[marker].parentPhase) |
+	       (1 ^ _phase[marker].parentPhase);
+	break;
+      case 5:
+	diff = (0 ^ _phase[marker].parentPhase) |
+	       (2 ^ _phase[marker].parentPhase);
+	break;
+      case 6:
+	diff = (1 ^ _phase[marker].parentPhase) |
+	       (2 ^ _phase[marker].parentPhase);
+	break;
+      case 9:
+	diff = (0 ^ _phase[marker].parentPhase) |
+	       (3 ^ _phase[marker].parentPhase);
+	break;
+      case 10:
+	diff = (1 ^ _phase[marker].parentPhase) |
+	       (3 ^ _phase[marker].parentPhase);
+	break;
+      case 12:
+	diff = (2 ^ _phase[marker].parentPhase) |
+	       (3 ^ _phase[marker].parentPhase);
+	break;
+	// three bits in the ambiguous value cases:
+      case 7:
+	diff = (0 ^ _phase[marker].parentPhase) |
+	       (1 ^ _phase[marker].parentPhase) |
+	       (2 ^ _phase[marker].parentPhase);
+	break;
+      case 11:
+	diff = (0 ^ _phase[marker].parentPhase) |
+	       (1 ^ _phase[marker].parentPhase) |
+	       (3 ^ _phase[marker].parentPhase);
+	break;
+      case 13:
+	diff = (0 ^ _phase[marker].parentPhase) |
+	       (2 ^ _phase[marker].parentPhase) |
+	       (3 ^ _phase[marker].parentPhase);
+	break;
+      case 14:
+	diff = (1 ^ _phase[marker].parentPhase) |
+	       (2 ^ _phase[marker].parentPhase) |
+	       (3 ^ _phase[marker].parentPhase);
+	break;
+      default:
+	// 15: includes the current value which shouldn't happen
+	fprintf(stderr, "ERROR: ambigParPhase status %d\n",
+		_phase[marker].ambigParPhase);
+	exit(15);
+	break;
+    }
+
+    for(int p = 0; p < 2; p++) {
+      uint8_t parIsAmbig = (diff >> p) & 1;
+      if (parIsAmbig)
+	// Both phase types valid (the current one and the one with this parent
+	// swapped), so neither allele is certain:
+	parAlleleIdx[p][0] = parAlleleIdx[p][1] = 1; // 1 is missing idx
+    }
   }
   else {
     // One parent homozygous; we should know which genotype:
