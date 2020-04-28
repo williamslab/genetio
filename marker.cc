@@ -616,12 +616,14 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 
     float morganDistToPrev = 1.0f;
 
-    if (prevMarker != NULL && chromIdx == prevMarker->_chromIdx) {
+    if (prevMarker != NULL) {
       // on second marker? update setGenetFromPhys
       if (_allMarkers.length() == 1) {
 	if (prevMarker->getMapPos() == 0.0f && mapPos == 0.0f) {
-	  setGenetFromPhys = 1;
 	  printf("WARNING: Setting genetic position from physical\n");
+	  setGenetFromPhys = 1;
+	  // update previous marker's map position (1 cM per Mb)
+	  prevMarker->_mapPos = (float) prevMarker->_physPos / (100 * 1000000);
 	}
 	else
 	  setGenetFromPhys = 0;
@@ -633,12 +635,11 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
 	  exit(1);
 	}
 	// 1 cM per Mb
-	morganDistToPrev = (physPos - prevMarker->getPhysPos()) /
-								(100 * 1000000);
+	mapPos = (float) physPos / (100 * 1000000);
       }
-      else {
+
+      if (chromIdx == prevMarker->_chromIdx)
 	morganDistToPrev = mapPos - prevMarker->getMapPos();
-      }
     }
     // Note: if alleles == NULL, the numAlleles argument will be ignored
     Marker *m = new Marker(markerName.c_str(), chromIdx, mapPos,
