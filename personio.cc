@@ -1476,7 +1476,6 @@ int PersonIO<P>::readGenoRow(uint8_t * &data, int bytesPerMarker) {
       fprintf(stderr, "ERROR reading data: unable to seek\n");
       exit(3);
     }
-    _curLoopMarker++;
   }
 
   int ret = fread(data, bytesPerMarker, sizeof(uint8_t), _loopGenoIn);
