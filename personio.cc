@@ -68,7 +68,8 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   int noFamilyId, bool vcfInput, bool printTrioKids,
 			   FILE *log, bool phased, int **numMendelError,
 			   int **numMendelCounted, bool allowEmptyParents,
-			   bool bulkData, bool loopData, bool useParents) {
+			   bool bulkData, bool loopData, bool useParents,
+			   bool ignoreAlleles) {
   FILE *outs[2] = { stdout, log };
 
   if (vcfInput) {
@@ -112,11 +113,11 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
   fflush(stdout);
 
   if (fileType == 0 || fileType == 1) {
-    Marker::readSNPFile(markerFile, onlyChr, startPos, endPos);
+    Marker::readSNPFile(markerFile, onlyChr, startPos, endPos, ignoreAlleles);
   }
   else {
     assert(fileType == 2);
-    Marker::readBIMFile(markerFile, onlyChr, startPos, endPos);
+    Marker::readBIMFile(markerFile, onlyChr, startPos, endPos, ignoreAlleles);
   }
 
   mult_printf(outs, "done.\n");
@@ -262,12 +263,13 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
 			   const char *indFile, const char *onlyChr,
 			   int startPos, int endPos, const char *XchrName,
 			   int noFamilyId, FILE *log, bool allowEmptyParents,
-			   bool bulkData, bool loopData, bool useParents) {
+			   bool bulkData, bool loopData, bool useParents,
+			   bool ignoreAlleles) {
   readData(genoFile, markerFile, indFile, onlyChr, startPos, endPos,
 	   XchrName, noFamilyId, /*vcfInput=*/ false, /*printTrioKids=*/ false,
 	   log, /*phased=*/ false, /*numMendelError=*/ NULL,
 	   /*numMendelCounted=*/ NULL, allowEmptyParents, bulkData,
-	   loopData, useParents);
+	   loopData, useParents, ignoreAlleles);
 }
 
 // Returns an integer representing the type of genotype file contained in the

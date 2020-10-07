@@ -39,11 +39,11 @@ class Marker {
     static void setReadOnlyOneChrom() { _readOnlyOneChrom = true; }
     static bool getReadOnlyOneChrom() { return _readOnlyOneChrom; }
     static void readSNPFile(const char *snpFile, const char *onlyChr,
-			    int startPos, int endPos);
+			    int startPos, int endPos, bool ignoreAlleles);
     static void readMapFile(const char *mapFile, const char *onlyChr,
 			    int startPos, int endPos);
     static void readBIMFile(const char *bimFile, const char *onlyChr,
-			    int startPos, int endPos);
+			    int startPos, int endPos, bool ignoreAlleles);
 #ifdef VCF
     static void readVCFFile(htsFile *vcfIn, tbx_t *index, hts_itr_t *itr,
 			    int startPos, int endPos);
@@ -144,7 +144,7 @@ class Marker {
     //////////////////////////////////////////////////////////////////
 
     static void readMarkers(FILE *in, const char *onlyChr, int type,
-			    int startPos, int endPos);
+			    int startPos, int endPos, bool ignoreAlleles);
     static void updateInfoPrevChrom(int prevChromIdx, int numMarkersPrevChrom);
     static void setNumMarkersInWindow(int startMarkerNum, int numMarkers);
     static int  skipWhitespace(char *curBuf, size_t &bind, size_t &nread,

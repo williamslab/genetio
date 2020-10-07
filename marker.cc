@@ -27,11 +27,11 @@ dynarray<float> Marker::_hapWindowMapCenter;
 
 // Read Reich lab format .snp file
 void Marker::readSNPFile(const char *snpFile, const char *onlyChr, int startPos,
-			 int endPos) {
+			 int endPos, bool ignoreAlleles) {
   FILE *outs[2] = { stdout, NULL };
   FILE *in = openRead(snpFile, "SNP", outs);
 
-  readMarkers(in, onlyChr, /*type=*/ 1, startPos, endPos);
+  readMarkers(in, onlyChr, /*type=*/ 1, startPos, endPos, ignoreAlleles);
   fclose(in);
 }
 
@@ -41,17 +41,18 @@ void Marker::readMapFile(const char *mapFile, const char *onlyChr, int startPos,
   FILE *outs[2] = { stdout, NULL };
   FILE *in = openRead(mapFile, "map", outs);
 
-  readMarkers(in, onlyChr, /*type=*/ 2, startPos, endPos);
+  readMarkers(in, onlyChr, /*type=*/ 2, startPos, endPos,
+	      /*ignoreAlleles (none in file)=*/ true);
   fclose(in);
 }
 
 // Read PLINK format .bim file
 void Marker::readBIMFile(const char *bimFile, const char *onlyChr, int startPos,
-			 int endPos) {
+			 int endPos, bool ignoreAlleles) {
   FILE *outs[2] = { stdout, NULL };
   FILE *in = openRead(bimFile, "BIM", outs);
 
-  readMarkers(in, onlyChr, /*type=*/ 3, startPos, endPos);
+  readMarkers(in, onlyChr, /*type=*/ 3, startPos, endPos, ignoreAlleles);
   fclose(in);
 }
 
@@ -369,7 +370,7 @@ void Marker::replaceBuffer(FILE *in, char *&curBuf, char *&nextBuf,
 // If type == 2, reads PLINK format .map file
 // If type == 3, reads PLINK format .bim file
 void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
-			 int endPos) {
+			 int endPos, bool ignoreAlleles) {
   const size_t BUF_SIZE = 2048;
   char buf1[BUF_SIZE], buf2[BUF_SIZE];
   char *curBuf, *nextBuf;
@@ -422,25 +423,31 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       if (stat < 0) break;
       physPos = atoi(tmpStr);
 
+      // Get allele 0:
       stat = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
       if (stat < 0) break;
 
-      // Should we just not include the variant if it is not a SNP?
-      if (strlen(&tmpStr[0]) != sizeof(char)) {
-        fprintf(stderr, "ERROR: alleles expected to be single characters\n");
-        fprintf(stderr, "At marker %s\n", markerName.c_str());
-        exit(1);
-      } 
-      alleles[0] = tmpStr[0];
+      if (!ignoreAlleles) {
+	// Should we just not include the variant if it is not a SNP?
+	if (strlen(&tmpStr[0]) != sizeof(char)) {
+	  fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+	  fprintf(stderr, "At marker %s\n", markerName.c_str());
+	  exit(1);
+	}
+	alleles[0] = tmpStr[0];
+      }
 
+      // Get allele 1:
       stat = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
       if (stat < 0) break;
-      if (strlen(&tmpStr[0]) != sizeof(char)) {
-        fprintf(stderr, "ERROR: alleles expected to be single characters\n");
-        fprintf(stderr, "At marker %s\n", markerName.c_str());
-        exit(1);
+      if (!ignoreAlleles) {
+	if (strlen(&tmpStr[0]) != sizeof(char)) {
+	  fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+	  fprintf(stderr, "At marker %s\n", markerName.c_str());
+	  exit(1);
+	}
+	alleles[2] = tmpStr[0];
       } 
-      alleles[2] = tmpStr[0];
 
       // Check if extra material on the line (i.e. newline check)
       char c = curBuf[bind];
@@ -505,22 +512,26 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
       if (type == 3) { // for .bim files, must read alleles
         stat = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
         if (stat < 0) break;
-        // Allele should only be one character...
-        if (strlen(&tmpStr[0]) != 1) {
-          fprintf(stderr, "ERROR: alleles expected to be single characters\n");
-          fprintf(stderr, "At marker %s\n", markerName.c_str());
-          exit(1);
-        } 
-        alleles[0] = tmpStr[0];
+	if (!ignoreAlleles) {
+	  // Allele should only be one character...
+	  if (strlen(&tmpStr[0]) != 1) {
+	    fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+	    fprintf(stderr, "At marker %s\n", markerName.c_str());
+	    exit(1);
+	  }
+	  alleles[0] = tmpStr[0];
+	}
 
         stat = readDoubleBuffer(in, tmpStr, curBuf, nextBuf, bind, nread, BUF_SIZE);
         if (stat < 0) break;
-        if (strlen(&tmpStr[0]) != 1) {
-          fprintf(stderr, "ERROR: alleles expected to be single characters\n");
-          fprintf(stderr, "At marker %s\n", markerName.c_str());
-          exit(1);
-        } 
-        alleles[2] = tmpStr[0];
+	if (!ignoreAlleles) {
+	  if (strlen(&tmpStr[0]) != 1) {
+	    fprintf(stderr, "ERROR: alleles expected to be single characters\n");
+	    fprintf(stderr, "At marker %s\n", markerName.c_str());
+	    exit(1);
+	  }
+	  alleles[2] = tmpStr[0];
+	}
       }
 
       char c = curBuf[bind];
@@ -644,7 +655,8 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
     // Note: if alleles == NULL, the numAlleles argument will be ignored
     Marker *m = new Marker(markerName.c_str(), chromIdx, mapPos,
 			   morganDistToPrev, physPos,
-			   (type == 2) ? NULL : alleles, /*numAlleles=*/ 2);
+			   (type == 2 || ignoreAlleles) ? NULL : alleles,
+			   /*numAlleles=*/ 2);
 
     if (prevMarker != NULL) {
       int prevChromIdx = prevMarker->_chromIdx;

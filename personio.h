@@ -32,13 +32,14 @@ class PersonIO {
 			 bool phased = false, int **numMendelError = NULL,
 			 int **numMendelCounted = NULL,
 			 bool allowEmptyParents = false, bool bulkData = false,
-			 bool loopData = false, bool useParents = true);
+			 bool loopData = false, bool useParents = true,
+			 bool ignoreAlleles = false);
     static void readData(const char *genoFile, const char *markerFile,
 			 const char *indFile, const char *onlyChr,
 			 int startPos, int endPos, const char *XchrName,
 			 int noFamilyId, FILE *log, bool allowEmptyParents,
 			 bool bulkData, bool loopData = false,
-			 bool useParents = true);
+			 bool useParents = true, bool ignoreAlleles = false);
 
 #ifdef VCF
     static void readVCF(const char *vcfFile, const char *onlyChr, int startPos,
