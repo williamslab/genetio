@@ -25,7 +25,7 @@ ifdef VCF
   CFLAGS += -DVCF
 endif
 
-CPPFLAGS = -std=c++0x $(CFLAGS)
+CPPFLAGS = -std=c++2a $(CFLAGS)
 
 # dependency variables / commands
 DEPDIR = .deps

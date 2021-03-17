@@ -4,8 +4,11 @@
 // This program is distributed under the terms of the GNU General Public License
 
 #include <time.h>
+#include <bit>
 #include "nuclearfamily.h"
 #include "util.h"
+
+using namespace std;
 
 NuclearFamily::fam_ht NuclearFamily::_families;
 
