@@ -74,6 +74,7 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
   // add characters to indicate what the phase of the other parent would be if
   // which one is heteorzygous is flipped.
   bool encounteredFirstFullP = false;
+  bool onChrX = Marker::isChromX(chrIdx);
   for(int m = firstMarker; m <= lastMarker; m++) {
     const char *theAlleles = Marker::getMarker(m)->getAlleleStr();
     // For use with the printGeno() method: allows printing an unknown genotype
@@ -141,6 +142,7 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	    fprintf(out, " R");
 	    break;
 	  case PHASE_OK: // can't get here but put case in to prevent warning
+	  case PHASE_X_SPECIAL:
 	  case NUM_PHASE_STATUS:
 	    break;
 	}
@@ -157,14 +159,67 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	fprintf(out, "\n");
 	break;
 
+      case PHASE_X_SPECIAL:
+	{
+	  // assuming there is no ambiguity, Dad's genotype is what's stored in
+	  // <homParentGeno>, and Mom is the opposite:
+	  uint8_t parGeno[2];
+	  parGeno[0] = _phase[m].homParentGeno;
+	  // in PLINK genotypes G_HOM0 == 0 && G_HOM1 == 3, so can XOR to get
+	  // opposite:
+	  parGeno[1] = parGeno[0] ^ 3;
+	  swapHet = _phase[m].uninfHetSwap;
+	  untrans = _phase[m].untransParHap;
+
+	  // note: this marker/phase type is only applicable when both parents
+	  // are missing
+	  printGeno(out, alleles, parGeno[0], ambigMissType[ /*isMissing=*/ 1 ],
+		    /*dad untrans=*/ untrans & 3);
+	  fprintf(out, "   ");
+	  printGeno(out, alleles, parGeno[1], ambigMissType[ /*isMissing=*/ 1 ],
+		    /*mom untrans=*/ untrans >> 2);
+	  if (untrans > 3)
+	    // dad and at least one of Mom's alleles are marked as untransmitted
+	    // this is the special case where we can, at best, only impute one
+	    // of Mom's alleles and we can't phase the children; indicate this
+	    // with '?' divider as in PHASE_AMBIG
+	    fprintf(out, " ?");
+	  else
+	    fprintf(out, " |");
+
+	  // print the children's genotypes
+	  childrenData = _phase[m].iv;
+	  for(int c = 0; c < numChildren; c++) {
+	    fprintf(out, " ");
+	    printGeno(out, alleles, childrenData & 3, /*sep=*/ '/',
+		    /*untrans=NA=*/ 0, swapHet);
+	    fprintf(out, "   ");
+	    childrenData >>= 2;
+	  }
+	  fprintf(out, "\n");
+	}
+	break;
+
       case PHASE_OK:
 	/////////////////////////////////////////////////////////////////////
 	// Standard phased marker
 
 	// determine which alleles each parent has on each haplotype;
-	getParAlleles(m, parAlleleIdx);
+	getParAlleles(m, parAlleleIdx, onChrX);
 
 	hetParent = _phase[m].hetParent;
+	if (hetParent < 2) {
+	  uint8_t hetParUntrans =
+			       (_phase[m].untransParHap >> (2 * hetParent)) & 3;
+	  if (hetParUntrans) {
+	    if (hetParUntrans == 3) // both untransmitted
+	      parAlleleIdx[hetParent][0] = parAlleleIdx[hetParent][1] = 1;
+	    else { // only one haplotype untransmitted:
+	      uint8_t hap = hetParUntrans >> 1; // bit to idx (01 => 0; 10 => 1)
+	      parAlleleIdx[hetParent][hap] = 1;
+	    }
+	  }
+	}
 
 	// print parent's haplotypes
 	uint8_t parIsMiss[2];
@@ -357,9 +412,14 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	  // TODO: add to the IV output
 	  char curIVchars[2] = { ivLabel[ ivs[0] + ((curIVflip & 1) << 1) ],
 				 ivLabel[ ivs[1] + (curIVflip & 2) ] };
-	  fprintf(out, " %c%c%c %c%c", alleles[ parAlleleIdx[0][ ivs[0] ] ],
-		  ambigMissType[curAmbigMiss],
-		  alleles[ parAlleleIdx[1][ ivs[1] ] ],
+	  char childAlleles[2] = { alleles[ parAlleleIdx[0][ ivs[0] ] ],
+				   alleles[ parAlleleIdx[1][ ivs[1] ] ] };
+	  if (onChrX && ivs[0] == 1) {
+	    curIVchars[0] = '_';
+	    childAlleles[0] = childAlleles[1];
+	  }
+	  fprintf(out, " %c%c%c %c%c", childAlleles[0],
+		  ambigMissType[curAmbigMiss], childAlleles[1],
 		  curIVchars[0], curIVchars[1]);
 	  iv >>= 2;
 	  ivFlippable >>= 2;
@@ -379,7 +439,8 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	break;
 
       default:
-	fprintf(stderr, "ERROR: marker status %d\n", _phase[m].status);
+	fprintf(stderr, "ERROR: marker status %d, marker %d\n",
+		_phase[m].status, m);
 	exit(1);
 	break;
     }
@@ -411,9 +472,16 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
   for(int h = 0; h < numHaps; h++)
     hapStrs[h] = new char[numMarkers];
 
+  bool onChrX = false;
+  int lastChrIdx = -1;
   for(int m = 0; m < numMarkers; m++) {
     const char *theAlleles = Marker::getMarker(m)->getAlleleStr();
     char alleles[3] = { theAlleles[0], '0', theAlleles[2] };
+
+    if (Marker::getMarker(m)->getChromIdx() != lastChrIdx) {
+      lastChrIdx = Marker::getMarker(m)->getChromIdx();
+      onChrX = Marker::isChromX(lastChrIdx);
+    }
 
     PhaseStatus status = _phase[m].status;
     uint8_t imputeParGeno = G_MISS; // by default no imputation
@@ -503,11 +571,97 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 	}
 	break;
 
+      case PHASE_X_SPECIAL:
+	{
+	  // assuming there is no ambiguity, Dad's genotype is what's stored in
+	  // <homParentGeno>, and Mom is the opposite:
+	  uint8_t parGeno[2];
+	  parGeno[0] = _phase[m].homParentGeno;
+	  // in PLINK genotypes G_HOM0 == 0 && G_HOM1 == 3, so can XOR to get
+	  // opposite:
+	  parGeno[1] = parGeno[0] ^ 3;
+	  swapHet = _phase[m].uninfHetSwap;
+
+	  for(int par = 0; par < 2; par++) {
+	    uint8_t thisUntrans = (_phase[m].untransParHap >> (par * 2)) & 3;
+	    uint8_t genoToPrint = parGeno[par];
+
+	    for(int hap = 0; hap < 2; hap++) {
+	      uint8_t curUntrans = (thisUntrans >> hap) & 1;
+	      // if untransmitted, then missing:
+	      uint8_t curGenoToPrint = (1 - curUntrans) * genoToPrint +
+							  curUntrans * G_MISS;
+	      // TODO: make function
+	      switch (curGenoToPrint) {
+		case G_HOM0:
+		  hapStrs[par * 2 + hap][m] = alleles[0];
+		  break;
+		case G_MISS:
+		  hapStrs[par * 2 + hap][m] = '0';
+		  break;
+		case G_HET:
+		  hapStrs[par * 2 + hap][m] = alleles[ hap * 2 ];
+		  break;
+		case G_HOM1:
+		  hapStrs[par * 2 + hap][m] = alleles[2];
+		  break;
+	      }
+	    } // haplotype
+	  } // parent
+
+	  if (!withChildren)
+	    // not printing children: done
+	    break;
+
+	  // TODO: make function
+	  // also printing children
+	  uint64_t childrenData = _phase[m].iv;
+	  for(int c = 0; c < numChildren; c++) {
+	    uint8_t childGenotype = childrenData & 3;
+
+	    uint8_t hap0;
+	    switch (childGenotype) {
+	      case G_HOM0:
+		hapStrs[4 + c*2 + 0][m] = hapStrs[4 + c*2 + 1][m] = alleles[0];
+		break;
+	      case G_MISS:
+		hapStrs[4 + c*2 + 0][m] = hapStrs[4 + c*2 + 1][m] = '0';
+		break;
+	      case G_HET:
+		// if <swapHet> == 0, hap0 == 0. Otherwise, hap0 == 1 (swapped)
+		hap0 = swapHet;
+		hapStrs[4 + c*2 + hap0][m] = alleles[0];
+		hapStrs[4 + c*2 + (1 - hap0)][m] = alleles[2];
+		break;
+	      case G_HOM1:
+		hapStrs[4 + c*2 + 0][m] = hapStrs[4 + c*2 + 1][m] = alleles[2];
+		break;
+	    }
+
+	    childrenData >>= 2;
+	  }
+	}
+	break;
+
       case PHASE_OK:
 	///////////////////////////////////////////////////////////////////
 	// Standard phased marker
 
-	getParAlleles(m, parAlleleIdx);
+	getParAlleles(m, parAlleleIdx, onChrX);
+
+	if (_phase[m].hetParent < 2) {
+	  uint8_t hetParent = _phase[m].hetParent;
+	  uint8_t hetParUntrans =
+			       (_phase[m].untransParHap >> (2 * hetParent)) & 3;
+	  if (hetParUntrans) {
+	    if (hetParUntrans == 3) // both untransmitted
+	      parAlleleIdx[hetParent][0] = parAlleleIdx[hetParent][1] = 1;
+	    else { // only one haplotype untransmitted:
+	      uint8_t hap = hetParUntrans >> 1; // bit to idx (01 => 0; 10 => 1)
+	      parAlleleIdx[hetParent][hap] = 1;
+	    }
+	  }
+	}
 
 	for(int par = 0; par < 2; par++)
 	  for(int har = 0; har < 2; har++)
@@ -542,7 +696,7 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
     if (par == 1)
       fprintf(out, ","); // separate the parent values in "parhaps" by commas
 
-    // Place the two haplotypes each parent possesses into another array 
+    // Place the two haplotypes each parent possesses into another array
     fprintf(out, "[");
 
     for(int hap = 0; hap < 2; hap++) {
@@ -607,7 +761,7 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
   // add characters to indicate what the phase of the other parent would be if
   // which one is heteorzygous is flipped.
   bool encounteredFirstFullP = false;
-  int lastChrIdx = -1;
+  lastChrIdx = -1;
   for(int m = 0; m < numMarkers; m++) {
     if (m > 0)
       fprintf(out, ","); // separate marker codes by commas
@@ -618,12 +772,17 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
     }
 
     PhaseStatus status = _phase[m].status;
+    uint8_t untrans = _phase[m].untransParHap;
     switch(status) {
       case PHASE_UNINFORM:
 	fprintf(out, "null");
 	break;
       case PHASE_AMBIG:
-	fprintf(out, "[\"?\"]");
+      case PHASE_X_SPECIAL:
+	if (untrans > 3)
+	  fprintf(out, "[\"?\"]");
+	else
+	  fprintf(out, "null");
 	break;
       case PHASE_ERROR:
 	fprintf(out, "[\"E\"]");
@@ -813,6 +972,8 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 	}
 	break;
       default:
+	fprintf(stderr, "ERROR: marker status %d\n", _phase[m].status);
+	exit(1);
 	break;
     }
   }
@@ -826,7 +987,8 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 // Determines the alleles the two parents carry at <marker>. The caller has a
 // character array with 3 entries: index 0 is allele 0, index 1 is the missing
 // allele code (likely '0'), and index 2 is allele 1
-void NuclearFamily::getParAlleles(int marker, uint8_t parAlleleIdx[2][2]) {
+void NuclearFamily::getParAlleles(int marker, uint8_t parAlleleIdx[2][2],
+				  bool onChrX) {
   uint8_t hetParent = _phase[marker].hetParent;
   uint8_t defaultPhase = _phase[marker].parentPhase;
 
@@ -957,8 +1119,7 @@ void NuclearFamily::getParAlleles(int marker, uint8_t parAlleleIdx[2][2]) {
     }
   }
   else {
-    // One parent homozygous; we should know which genotype:
-    assert(_phase[marker].homParentGeno != G_MISS);
+    // One parent homozygous
 
     // assuming no ambiguity, these are the parent allele indexes:
     int idx0 = 0 * (1 - defaultPhase) + 2 * defaultPhase;
@@ -967,8 +1128,13 @@ void NuclearFamily::getParAlleles(int marker, uint8_t parAlleleIdx[2][2]) {
     parAlleleIdx[1 - hetParent][0] = parAlleleIdx[1 - hetParent][1] =
 					(_phase[marker].homParentGeno / 3) * 2;
 
+    if (_phase[marker].homParentGeno == G_MISS) {
+      assert(onChrX);
+      // 1 is missing idx
+      parAlleleIdx[1 - hetParent][0] = parAlleleIdx[1 - hetParent][1] = 1;
+    }
     // ambig par het? if so, haplotype allele index could be uncertain
-    if (_phase[marker].ambigParHet) {
+    else if (_phase[marker].ambigParHet) {
       // If the ambiguous heterozygosity is with only parent (1 - <hetParent>)
       // being heterozygous (H0 or H1):
       uint8_t otherP = 1 - hetParent;
@@ -1047,7 +1213,7 @@ void NuclearFamily::getParAlleles(int marker, uint8_t parAlleleIdx[2][2]) {
 	    // only one phase type; determine whether the <hetParent> phase
 	    // remains the same as the default
 	    uint8_t bothHetPhase_defaultHetPar =(phaseSwapType >> hetParent) &1;
-	    if (bothHetPhase_defaultHetPar != defaultPhase) 
+	    if (bothHetPhase_defaultHetPar != defaultPhase)
 	      // opposite phase assignment when heterozygous for both parents,
 	      // so both alleles are ambiguous:
 	      parAlleleIdx[hetParent][0] = parAlleleIdx[hetParent][1] = 1;

@@ -18,6 +18,7 @@ enum PhaseStatus {
   PHASE_AMBIG,
   PHASE_ERROR,
   PHASE_ERR_RECOMB,
+  PHASE_X_SPECIAL,
   NUM_PHASE_STATUS
 };
 
@@ -50,7 +51,7 @@ struct PhaseVals {
   // informative markers
   bool ambigBothParHomozy;
   uint8_t parentPhase;   // Can fit in 2 bits
-  PhaseStatus status;    // Can fit in 2 bits
+  PhaseStatus status;    // Can fit in 3 bits
   // TODO: recalculate this when needed?
   uint8_t numRecombs;    // Since previous marker
   uint8_t ambigParHet;   // Can fit in 3 bit
@@ -133,6 +134,10 @@ class NuclearFamily {
       _phase[marker].status = status;
     }
 
+    PhaseStatus getStatus(int marker) {
+      return _phase[marker].status;
+    }
+
     // For setting a marker's phase status to be uninformative; we require a
     // value for <homParentGeno> which is used for imputing the genotypes of
     // the parents when one or both are missing data
@@ -145,6 +150,19 @@ class NuclearFamily {
       _phase[marker].homParentGeno = homParentGeno;
       _phase[marker].uninfHetSwap = uninfHetSwap;
       _phase[marker].status = PHASE_UNINFORM;
+    }
+
+    // For setting a marker's phase status to be the special X type. See
+    // HAPI2's Phaser::getMarkerTypeX() method for more details
+    void setSpecialX(int marker, uint8_t parentData, uint64_t childrenData,
+		     uint64_t missing, uint8_t homParentGeno,
+		     uint8_t uninfHetSwap) {
+      _phase[marker].iv = childrenData;
+      _phase[marker].ambigMiss = missing;
+      _phase[marker].parentData = parentData;
+      _phase[marker].homParentGeno = homParentGeno;
+      _phase[marker].uninfHetSwap = uninfHetSwap;
+      _phase[marker].status = PHASE_X_SPECIAL;
     }
 
     // <ambig> should have the higher order bit (of the two bits allotted each
@@ -213,7 +231,7 @@ class NuclearFamily {
     // private methods
     //////////////////////////////////////////////////////////////////
 
-    void getParAlleles(int marker, uint8_t parAlleleIdx[2][2]);
+    void getParAlleles(int marker, uint8_t parAlleleIdx[2][2], bool onChrX);
     void printOnePedHap(FILE *out, int p, int c);
 
     // alleles is expected to contain in elements 0 and 2 the two alleles for
