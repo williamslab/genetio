@@ -778,6 +778,8 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 	fprintf(out, "null");
 	break;
       case PHASE_AMBIG:
+	fprintf(out, "[\"?\"]");
+	break;
       case PHASE_X_SPECIAL:
 	if (untrans > 3)
 	  fprintf(out, "[\"?\"]");
