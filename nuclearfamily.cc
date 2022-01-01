@@ -207,29 +207,32 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	// determine which alleles each parent has on each haplotype;
 	getParAlleles(m, parAlleleIdx, onChrX);
 
+	uint8_t parGeno[2];
+	parGeno[0] = _phase[m].parentData & 3;
+	parGeno[1] = (_phase[m].parentData >> 2) & 3;
+
 	hetParent = _phase[m].hetParent;
-	if (hetParent < 2) {
+	if (hetParent < 2 && parGeno[ hetParent ] == G_MISS) {
+	  // set untansmitted haplotypes to missing (only if the parent is
+	  // missing data)
 	  uint8_t hetParUntrans =
 			       (_phase[m].untransParHap >> (2 * hetParent)) & 3;
 	  if (hetParUntrans) {
 	    if (hetParUntrans == 3) // both untransmitted
 	      parAlleleIdx[hetParent][0] = parAlleleIdx[hetParent][1] = 1;
 	    else { // only one haplotype untransmitted:
-	      uint8_t hap = hetParUntrans >> 1; // bit to idx (01 => 0; 10 => 1)
+	      uint8_t hap = hetParUntrans >> 1; // bit to idx: 01 => 0; 10 => 1
 	      parAlleleIdx[hetParent][hap] = 1;
 	    }
 	  }
 	}
 
 	// print parent's haplotypes
-	uint8_t parIsMiss[2];
-	parIsMiss[0] = _phase[m].parentData & 3;
-	parIsMiss[1] = (_phase[m].parentData >> 2) & 3;
 	fprintf(out, "%c%c%c %c %c%c%c ",
-		alleles[ parAlleleIdx[0][0] ], ambigMissType[ parIsMiss[0] ],
+		alleles[ parAlleleIdx[0][0] ], ambigMissType[ parGeno[0] ],
 		alleles[ parAlleleIdx[0][1] ],
 		markerType[hetParent],
-		alleles[ parAlleleIdx[1][0] ], ambigMissType[ parIsMiss[1] ],
+		alleles[ parAlleleIdx[1][0] ], ambigMissType[ parGeno[1] ],
 		alleles[ parAlleleIdx[1][1] ]);
 
 	// print phase status
@@ -649,16 +652,23 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 
 	getParAlleles(m, parAlleleIdx, onChrX);
 
-	if (_phase[m].hetParent < 2) {
-	  uint8_t hetParent = _phase[m].hetParent;
-	  uint8_t hetParUntrans =
+	{
+	  uint8_t parGeno[2];
+	  parGeno[0] = _phase[m].parentData & 3;
+	  parGeno[1] = (_phase[m].parentData >> 2) & 3;
+
+	  if (_phase[m].hetParent < 2 &&
+				    parGeno[ _phase[m].hetParent ] == G_MISS) {
+	    uint8_t hetParent = _phase[m].hetParent;
+	    uint8_t hetParUntrans =
 			       (_phase[m].untransParHap >> (2 * hetParent)) & 3;
-	  if (hetParUntrans) {
-	    if (hetParUntrans == 3) // both untransmitted
-	      parAlleleIdx[hetParent][0] = parAlleleIdx[hetParent][1] = 1;
-	    else { // only one haplotype untransmitted:
-	      uint8_t hap = hetParUntrans >> 1; // bit to idx (01 => 0; 10 => 1)
-	      parAlleleIdx[hetParent][hap] = 1;
+	    if (hetParUntrans) {
+	      if (hetParUntrans == 3) // both untransmitted
+		parAlleleIdx[hetParent][0] = parAlleleIdx[hetParent][1] = 1;
+	      else { // only one haplotype untransmitted:
+		uint8_t hap = hetParUntrans >> 1;// bit to idx: 01 => 0; 10 => 1
+		parAlleleIdx[hetParent][hap] = 1;
+	      }
 	    }
 	  }
 	}
@@ -1351,7 +1361,7 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
 	    uint8_t hetParent = _phase[m].hetParent;
 	    uint8_t parentPhase = _phase[m].parentPhase;
 	    int parAlleleInds[2][2]; // Allele indexes: 0 for ref, 1 for alt
-	    if (hetParent == 0 || hetParent == 1) {
+	    if (hetParent < 2) {
 	      int idx0 = 0 * (1 - parentPhase) + parentPhase;
 	      parAlleleInds[hetParent][0] = idx0;
 	      parAlleleInds[hetParent][1] = 1 - idx0;
@@ -1368,7 +1378,23 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
 	      }
 	    }
 
-	    if (_phase[m].ambigParHet) {
+	    uint8_t parGeno[2];
+	    parGeno[0] = _phase[m].parentData & 3;
+	    parGeno[1] = (_phase[m].parentData >> 2) & 3;
+	    uint8_t hetParUntrans =
+			       (_phase[m].untransParHap >> (2 * hetParent)) & 3;
+	    if (hetParent < 2 && parGeno[ hetParent ] == G_MISS &&
+		hetParUntrans) {
+	      // if either is haplotype is untransmitted, we'll set both to
+	      // missing for VCF output
+	      if (hetParent == 0)
+		fprintf(out, "\t.|.\t%d|%d",
+			parAlleleInds[1][0], parAlleleInds[1][1]);
+	      else
+		fprintf(out, "\t%d|%d\t.|.",
+			parAlleleInds[0][0], parAlleleInds[0][1]);
+	    }
+	    else if (_phase[m].ambigParHet) {
 	      // unclear which parent is heterozygous
 	      // will show parents as missing
 	      fprintf(out, "\t.|.\t.|.");
@@ -1530,7 +1556,7 @@ void NuclearFamily::printOnePedHap(FILE *out, int p, int c) {
 	  uint8_t hetParent = _phase[m].hetParent;
 	  uint8_t parentPhase = _phase[m].parentPhase;
 	  char parAlleles[2][2];
-	  if (hetParent == 0 || hetParent == 1) {
+	  if (hetParent < 2) {
 	    int idx0 = 0 * (1 - parentPhase) + 2 * parentPhase;
 	    parAlleles[hetParent][0] = alleles[idx0];
 	    parAlleles[hetParent][1] = alleles[ 2 - idx0 ];
@@ -1548,7 +1574,18 @@ void NuclearFamily::printOnePedHap(FILE *out, int p, int c) {
 	  }
 
 	  if (p >= 0) {
-	    if (_phase[m].ambigParHet) {
+	    uint8_t parGeno[2];
+	    parGeno[0] = _phase[m].parentData & 3;
+	    parGeno[1] = (_phase[m].parentData >> 2) & 3;
+	    uint8_t hetParUntrans =
+			       (_phase[m].untransParHap >> (2 * hetParent)) & 3;
+	    if (hetParent < 2 && p == hetParent &&
+		parGeno[ hetParent ] == G_MISS && hetParUntrans) {
+	      // if either is haplotype is untransmitted, we'll set both to
+	      // missing for ped output
+	      fprintf(out, "\t0\t0");
+	    }
+	    else if (_phase[m].ambigParHet) {
 	      // unclear which parent is heterozygous
 	      // will show parents as missing
 	      fprintf(out, "\t0\t0");
