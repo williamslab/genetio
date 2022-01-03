@@ -199,6 +199,20 @@ class NuclearFamily {
       _phase[marker].ambigBothParHomozy = ambigBothParHomozy;
     }
 
+    // Same as above but only assigns untransParHap
+    void setUntransPar(int marker, uint8_t untransParHap) {
+      _phase[marker].untransParHap = untransParHap;
+    }
+
+    // Support for assigning one haplotype transmission regions (associated
+    // values sometimes need to be modified after their initial assignment)
+    void updateOHTVals(int marker, uint64_t ivFlippable, uint8_t ambigParHet,
+		       uint8_t ambigParPhase) {
+      _phase[marker].ivFlippable |= ivFlippable;
+      _phase[marker].ambigParHet |= ambigParHet;
+      _phase[marker].ambigParPhase |= ambigParPhase;
+    }
+
     const PhaseVals &getPhase(int marker) {
       return _phase[marker];
     }
