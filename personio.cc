@@ -129,6 +129,10 @@ void PersonIO<P>::readData(const char *genoFile, const char *markerFile,
   ///////////////////////////////////////////////////////////////////////
   // Parse individual file:
 
+  // reset values
+  P::_idToPerson.clear();
+  P::_allIndivs.clear();
+
   mult_printf(outs, "Parsing individual file... ");
   fflush(stdout);
 
