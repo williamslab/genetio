@@ -59,12 +59,14 @@ class PersonIO {
     static void printImpute2SampleFile(FILE *out, bool trioDuoOnly = false);
 
     // not needed -- only delete when program done: OS will manage
+    #ifdef FORCE_FREE
     static void cleanUp() {
       int len = P::_allIndivs.length();
       for(int p = 0; p < len; p++) {
 	    delete P::_allIndivs[p];
       }
     }
+    #endif
 
   private:
     //////////////////////////////////////////////////////////////////
