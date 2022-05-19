@@ -101,21 +101,25 @@ class NuclearFamily {
     static fam_ht::size_type numFamilies() { return _families.size(); }
 
     // not needed -- only delete when program done: OS will manage
+    #ifdef FORCE_FREE
     static void cleanUp() {
       for(fam_ht_iter it = _families.begin(); it != _families.end(); it++) {
         delete it->first;
         delete it->second;
       }
     }
+    #endif
 
     //////////////////////////////////////////////////////////////////
     // public methods
     //////////////////////////////////////////////////////////////////
 
     // not needed -- only delete when program done: OS will manage
+    #ifdef FORCE_FREE
     ~NuclearFamily() {
       if (_phase)  delete [] _phase;
     }
+    #endif
 
     int numChildren() { return _children.length(); }
     void initPhase() { _phase = new PhaseVals[ Marker::getNumMarkers() ]; }

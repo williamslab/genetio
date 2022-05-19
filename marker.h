@@ -27,11 +27,13 @@
 
 class Marker {
   public:
+    #ifdef FORCE_FREE
     ~Marker() { // not needed -- only delete when program done: OS will manage
       if (_numAlleles)
         delete [] _alleles;
       delete [] _name;
     }
+    #endif
 
     //////////////////////////////////////////////////////////////////
     // public static methods
@@ -105,6 +107,7 @@ class Marker {
     static const dynarray<int> & getMarkersToOmit() { return _omitMarkers; }
 
     // not needed -- only delete when program done: OS will manage
+    #ifdef FORCE_FREE
     static void cleanUp() {
       int len = _chromNames.length();
       for(int c = 0; c < len; c++) {
@@ -116,6 +119,7 @@ class Marker {
 	    delete _allMarkers[m];
       }
     }
+    #endif
 
     //////////////////////////////////////////////////////////////////
     // public methods
