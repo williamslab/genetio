@@ -394,7 +394,13 @@ void Marker::readMarkers(FILE *in, const char *onlyChr, int type, int startPos,
   nextBuf = buf2;
 
   nread = fread(curBuf, sizeof(char), BUF_SIZE, in);
-  
+
+  // reset values
+  #ifdef FORCE_FREE
+  _allMarkers = dynarray < Marker * >(600000);
+  _chromNames = dynarray < char * >();
+  #endif
+
   while (1) {
     // Note: I assume the map positions are in Morgans per the spec of both
     // the Reich lab SNP file format and the spec of the PLINK .map file format

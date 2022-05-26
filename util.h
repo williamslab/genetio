@@ -174,4 +174,11 @@ inline void mult_printf(FILE *outs[2], const char *msg) {
   }
 }
 
+inline size_t popcount(uint64_t val) {
+    // Currently using std::bitset, but the conversion is probably not free, so
+    // optimize? TODO
+    std::bitset<64> to_count(val);
+    return to_count.count();
+}
+
 #endif // UTIL_H
