@@ -23,6 +23,10 @@ enum PhaseStatus {
 };
 
 struct PhaseVals {
+  PhaseVals() {
+    status = NUM_PHASE_STATUS; // init
+  }
+
   // Inheritance vector for PHASE_OK status and contains the children's
   // genotype data in PLINK bed format (2 bits per child) otherwise:
   uint64_t iv;
