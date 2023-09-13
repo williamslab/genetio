@@ -1259,6 +1259,10 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
   fprintf(out, "##fileDate=%d%02d%02d\n", ptr_time->tm_year + 1900,
 	  ptr_time->tm_mon + 1, ptr_time->tm_mday);
   fprintf(out, "##source=\"%s\"\n", programName);
+  // contigs:
+  for(int chrIdx = 0; chrIdx < Marker::getNumChroms(); chrIdx++) {
+    fprintf(out, "##contig=<ID=%s>\n", Marker::getChromName(chrIdx));
+  }
 
   fprintf(out, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n");
 
