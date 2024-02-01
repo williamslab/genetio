@@ -240,7 +240,7 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 						      _phase[m].arbitraryPar) {
 	  if (_phase[m].arbitraryPar) {
 	    fprintf(out, "P");
-	    if (encounteredFirstFullP && hetParent < 2) {
+	    if (encounteredFirstFullP) {
 	      iv = _phase[m].iv;
 	      if ((iv & 1) == ((iv >> 1) & 1))
 		// if the other parent is heterozygous, he/she has the same
@@ -778,7 +778,7 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 
     if (Marker::getMarker(m)->getChromIdx() != lastChrIdx) {
       encounteredFirstFullP = false;
-      lastChrIdx = Marker::getMarker(m)->getChromIdx() != lastChrIdx;
+      lastChrIdx = Marker::getMarker(m)->getChromIdx();
     }
 
     PhaseStatus status = _phase[m].status;
@@ -814,7 +814,7 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 	  bool somethingPrinted = false;
 	  if (_phase[m].arbitraryPar) {
 	    fprintf(out, "\"P");
-	    if (encounteredFirstFullP && _phase[m].hetParent < 2) {
+	    if (encounteredFirstFullP) {
 	      uint64_t iv = _phase[m].iv;
 	      if ((iv & 1) == ((iv >> 1) & 1))
 		// if the other parent is heterozygous, he/she has the same
