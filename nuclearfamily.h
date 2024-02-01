@@ -212,6 +212,11 @@ class NuclearFamily {
       _phase[marker].untransParHap = untransParHap;
     }
 
+    // Set arbitraryPar (P) status:
+    void setArbitraryPar(int marker) {
+      _phase[marker].arbitraryPar = 1;
+    }
+
     // Support for assigning one haplotype transmission regions (associated
     // values sometimes need to be modified after their initial assignment)
     void updateOHTVals(int marker, uint64_t ivFlippable, uint8_t ambigParHet,
