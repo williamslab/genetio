@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <zlib.h>
 #include "dynarray.h"
-#include "hashtable.h"
 
 #ifdef VCF
 #include <htslib/hts.h>
