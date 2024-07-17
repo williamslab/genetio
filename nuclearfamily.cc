@@ -91,7 +91,9 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
     uint8_t swapHet = 0; // by default no swapping hets
     uint8_t parAlleleIdx[2][2];
     uint8_t homGenotypes[2] = { G_HOM0, G_HOM1 };
-    bool bothParHomozy = status == PHASE_AMBIG && _phase[m].ambigBothParHomozy;
+    bool bothParHomozy = _phase[m].ambigBothParHomozy;
+    // should only get <bothParHomozy> at phase ambiguous sites
+    assert(!bothParHomozy || status == PHASE_AMBIG);
     switch(status) {
       case PHASE_UNINFORM:
 	// can impute at uninformative markers, not the others, using the
@@ -491,7 +493,9 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
     uint8_t swapHet = 0; // by default no swapping hets
     uint8_t parAlleleIdx[2][2];
     uint8_t homGenotypes[2] = { G_HOM0, G_HOM1 };
-    bool bothParHomozy = status == PHASE_AMBIG && _phase[m].ambigBothParHomozy;
+    bool bothParHomozy = _phase[m].ambigBothParHomozy;
+    // should only get <bothParHomozy> at phase ambiguous sites
+    assert(!bothParHomozy || status == PHASE_AMBIG);
     switch(status) {
       case PHASE_UNINFORM:
 	// can impute at uninformative markers, not the others, using the
@@ -1346,16 +1350,15 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
 	      uint8_t untrans = _phase[m].untransParHap;
 	      for(int p = 0; p < 2; p++) {
 		uint8_t thisParGeno = parentData & 3;
-		uint8_t thisUntrans = untrans & 3;
 
 		// <isMissing> is 1 iff thisParGeno == 1:
 		uint8_t isMissing = (thisParGeno & 1) & ~(thisParGeno >> 1);
 		// VCF format seems not to support printing genotypes with one
-		// allele missing such as .|1, so we impute the parent (as homozygous)
-		// even if only one allele was transmitted.
-		uint8_t doImpute = isMissing | ((thisUntrans & 1) | (thisUntrans >> 1));
-		uint8_t genoToPrint = (1 - doImpute) * thisParGeno +
-						      doImpute * imputeParGeno;
+		// allele missing such as .|1, so we'll use <thisParGeno> (which
+		// is homozygous since this is an uninformative marker) for any
+		// <thisUntrans> value.
+		uint8_t genoToPrint = (1 - isMissing) * thisParGeno +
+						      isMissing * imputeParGeno;
 		fprintf(out, "\t");
 		// we set untrans = 0 since we decided what (full) genotype to print above
 		printGeno(out, alleles, genoToPrint, /*sep=*/ '|', /*untrans=*/ 0);

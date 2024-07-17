@@ -178,14 +178,14 @@ class NuclearFamily {
     // <missing> should have the lower order bit set to 1 if the corresponding
     // child is missing data.
     void setPhase(int marker, uint64_t iv, uint64_t ambig, uint64_t missing,
-		  uint64_t ivFlippable, uint8_t parMissing, uint8_t hetParent,
+		  uint64_t ivFlippable, uint8_t parentData, uint8_t hetParent,
 		  uint8_t homParentGeno, uint8_t parentPhase,
 		  uint8_t numRecombs, uint8_t ambigParHet,
 		  uint8_t ambigParPhase, uint8_t arbitraryPar) {
       _phase[marker].iv = iv;
       _phase[marker].ambigMiss = ambig | missing;
       _phase[marker].ivFlippable = ivFlippable;
-      _phase[marker].parentData = parMissing;
+      _phase[marker].parentData = parentData;
       _phase[marker].hetParent = hetParent;
       _phase[marker].homParentGeno = homParentGeno;
       _phase[marker].parentPhase = parentPhase;
@@ -244,6 +244,9 @@ class NuclearFamily {
     par_pair _parents;
     dynarray<PersonBulk *> _children;
 
+    // Stores phase for the family in the same format as used to phase it
+    PhaseVals *_phase;
+
   private:
     //////////////////////////////////////////////////////////////////
     // private static variables
@@ -292,13 +295,6 @@ class NuclearFamily {
 	  break;
       }
     }
-
-    //////////////////////////////////////////////////////////////////
-    // private variables
-    //////////////////////////////////////////////////////////////////
-
-    // Stores phase for the family in the same format as used to phase it
-    PhaseVals *_phase;
 };
 
 #endif // NUCLEARFAMILY_H
