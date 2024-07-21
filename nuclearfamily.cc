@@ -90,6 +90,8 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
     uint8_t imputeParGeno = G_MISS; // by default no imputation
     uint8_t swapHet = 0; // by default no swapping hets
     uint8_t parAlleleIdx[2][2];
+    uint8_t parMissEncoded;
+    uint8_t parMissing[2];
     uint8_t homGenotypes[2] = { G_HOM0, G_HOM1 };
     bool bothParHomozy = _phase[m].ambigBothParHomozy;
     // should only get <bothParHomozy> at phase ambiguous sites
@@ -209,12 +211,15 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 	// determine which alleles each parent has on each haplotype;
 	getParAlleles(m, parAlleleIdx, onChrX);
 
-	uint8_t parGeno[2];
-	parGeno[0] = _phase[m].parentData & 3;
-	parGeno[1] = (_phase[m].parentData >> 2) & 3;
+	// need to know whether each of the parents is missing below
+	// 01 is missing and 5 == 0101; below gives a 1 only if the
+	// corresponding parent is 01
+	parMissEncoded = (_phase[m].parentData & 5) & ~((_phase[m].parentData >> 1) & 5);
+	parMissing[0] = parMissEncoded & 3;
+	parMissing[1] = (parMissEncoded >> 2) & 3;
 
 	hetParent = _phase[m].hetParent;
-	if (hetParent < 2 && parGeno[ hetParent ] == G_MISS) {
+	if (hetParent < 2 && parMissing[ hetParent ]) {
 	  // set untansmitted haplotypes to missing (only if the parent is
 	  // missing data)
 	  uint8_t hetParUntrans =
@@ -231,10 +236,10 @@ void NuclearFamily::printHapTxt(FILE *out, int chrIdx) {
 
 	// print parent's haplotypes
 	fprintf(out, "%c%c%c %c %c%c%c ",
-		alleles[ parAlleleIdx[0][0] ], ambigMissType[ parGeno[0] ],
+		alleles[ parAlleleIdx[0][0] ], ambigMissType[ parMissing[0] ],
 		alleles[ parAlleleIdx[0][1] ],
 		markerType[hetParent],
-		alleles[ parAlleleIdx[1][0] ], ambigMissType[ parGeno[1] ],
+		alleles[ parAlleleIdx[1][0] ], ambigMissType[ parMissing[1] ],
 		alleles[ parAlleleIdx[1][1] ]);
 
 	// print phase status
@@ -657,12 +662,15 @@ void NuclearFamily::printHapJson(FILE *out, bool withChildren) {
 	getParAlleles(m, parAlleleIdx, onChrX);
 
 	{
-	  uint8_t parGeno[2];
-	  parGeno[0] = _phase[m].parentData & 3;
-	  parGeno[1] = (_phase[m].parentData >> 2) & 3;
+	  // need to know whether each of the parents is missing below
+	  // 01 is missing and 5 == 0101; below gives a 1 only if the
+	  // corresponding parent is 01
+	  uint8_t parMissEncoded = (_phase[m].parentData & 5) & ~((_phase[m].parentData >> 1) & 5);
+	  uint8_t parMissing[2];
+	  parMissing[0] = parMissEncoded & 3;
+	  parMissing[1] = (parMissEncoded >> 2) & 3;
 
-	  if (_phase[m].hetParent < 2 &&
-				    parGeno[ _phase[m].hetParent ] == G_MISS) {
+	  if (_phase[m].hetParent < 2 && parMissing[ _phase[m].hetParent ]) {
 	    uint8_t hetParent = _phase[m].hetParent;
 	    uint8_t hetParUntrans =
 			       (_phase[m].untransParHap >> (2 * hetParent)) & 3;
@@ -1415,9 +1423,14 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
 //	      for(int h = 0; h < 2; h++)
 //		parAlleleInds[p][h] = 1 - parAlleleInds[p][h];
 
-	    uint8_t parGeno[2];
-	    parGeno[0] = _phase[m].parentData & 3;
-	    parGeno[1] = (_phase[m].parentData >> 2) & 3;
+	    // need to know whether each of the parents is missing below
+	    // 01 is missing and 5 == 0101; below gives a 1 only if the
+	    // corresponding parent is 01
+	    uint8_t parMissEncoded = (_phase[m].parentData & 5) & ~((_phase[m].parentData >> 1) & 5);
+	    uint8_t parMissing[2];
+	    parMissing[0] = parMissEncoded & 3;
+	    parMissing[1] = (parMissEncoded >> 2) & 3;
+
 	    uint8_t hetParent = _phase[m].hetParent;
 	    uint8_t thisParHetAmbigPhase = _phase[m].ambigParPhase;
 	    if (thisParHetAmbigPhase) {
@@ -1443,7 +1456,7 @@ void NuclearFamily::printPhasedVCF(FILE *out, const char *programName) {
 	      // TODO: comment
 	      prevMarkerUncertainHet = false;
 
-	      if (hetParent < 2 && parGeno[ hetParent ] == G_MISS) {
+	      if (hetParent < 2 && parMissing[ hetParent ]) {
 		// if one haplotype is untransmitted, we'll print a homozygous
 		// call
 		uint8_t hetParUntrans =
@@ -1648,13 +1661,18 @@ void NuclearFamily::printOnePedHap(FILE *out, int p, int c) {
 	  }
 
 	  if (p >= 0) {
-	    uint8_t parGeno[2];
-	    parGeno[0] = _phase[m].parentData & 3;
-	    parGeno[1] = (_phase[m].parentData >> 2) & 3;
+	    // need to know whether each of the parents is missing below
+	    // 01 is missing and 5 == 0101; below gives a 1 only if the
+	    // corresponding parent is 01
+	    uint8_t parMissEncoded = (_phase[m].parentData & 5) & ~((_phase[m].parentData >> 1) & 5);
+	    uint8_t parMissing[2];
+	    parMissing[0] = parMissEncoded & 3;
+	    parMissing[1] = (parMissEncoded >> 2) & 3;
+
 	    uint8_t hetParUntrans =
 			       (_phase[m].untransParHap >> (2 * hetParent)) & 3;
-	    if (hetParent < 2 && p == hetParent &&
-		parGeno[ hetParent ] == G_MISS && hetParUntrans) {
+	    if (hetParent < 2 && p == hetParent && parMissing[ hetParent ] &&
+		hetParUntrans) {
 	      // if either is haplotype is untransmitted, we'll set both to
 	      // missing for ped output
 	      fprintf(out, "\t0\t0");
